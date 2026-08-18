@@ -357,6 +357,15 @@ class ModelHarness:
                     if retry < max_retries:
                         await asyncio.sleep(0.1 * (2 ** retry))
 
+        # If no cloud LLM keys configured or calls failed, use local extractive synthesizer for offline demo
+        if passages:
+            best_passage = passages[0]
+            import re
+            sentences = [s.strip() for s in re.split(r'[.।\n॥]', best_passage) if len(s.strip()) > 15]
+            extractive_ans = ". ".join(sentences[:2]) if sentences else best_passage[:180]
+            if extractive_ans:
+                return f"Based on the retrieved evidence: {extractive_ans}. [S1]", "extractive_synthesizer (demo mode)", attempt
+
         # All providers failed — return explicit no-answer signal
         logger.error(f"All LLM providers failed. Last error: {last_error}")
         return "", "none", attempt
