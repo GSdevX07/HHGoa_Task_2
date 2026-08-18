@@ -1,0 +1,116 @@
+[
+  {
+    "id": "msmarco_xi_hi_001",
+    "language": "hi",
+    "lang_name": "Hindi",
+    "query": "भारत की राजधानी क्या है?",
+    "query_en": "What is the capital of India?",
+    "answers": [
+      "नई दिल्ली भारत की राजधानी है।"
+    ],
+    "passage": "नई दिल्ली भारत की आधिकारिक राजधानी है। यह भारत सरकार के तीन अंगों: कार्यपालिका, विधायिका और न्यायपालिका का केंद्र है। राष्ट्रपति भवन, संसद भवन और सर्वोच्च न्यायालय नई दिल्ली में ही स्थित हैं।",
+    "passage_en": "New Delhi is the official capital of India. It serves as the seat of all three branches of the Government of India: Executive, Legislature, and Judiciary. Rashtrapati Bhavan, Parliament House, and the Supreme Court are located here."
+  },
+  {
+    "id": "msmarco_xi_en_002",
+    "language": "en",
+    "lang_name": "English",
+    "query": "What is Retrieval-Augmented Generation (RAG)?",
+    "answers": [
+      "RAG is an AI framework that combines vector retrieval with generative language models to provide accurate, grounded responses."
+    ],
+    "passage": "Retrieval-Augmented Generation (RAG) is an architectural pattern in AI that enhances Large Language Models (LLMs) by connecting them to external authoritative knowledge bases. When a user asks a question, the system searches a vector database for relevant passages and passes them to the LLM to generate grounded answers with high factual accuracy.",
+    "passage_en": "Retrieval-Augmented Generation (RAG) is an architectural pattern in AI that enhances Large Language Models (LLMs) by connecting them to external authoritative knowledge bases. When a user asks a question, the system searches a vector database for relevant passages and passes them to the LLM to generate grounded answers with high factual accuracy."
+  },
+  {
+    "id": "msmarco_xi_te_003",
+    "language": "te",
+    "lang_name": "Telugu",
+    "query": "ఇస్రో ప్రధాన కార్యాలయం ఎక్కడ ఉంది?",
+    "query_en": "Where is the headquarters of ISRO located?",
+    "answers": [
+      "ఇస్రో ప్రధాన కార్యాలయం బెంగళూరులో ఉంది."
+    ],
+    "passage": "భారత అంతరిక్ష పరిశోధనా సంస్థ (ISRO) అనేది భారతదేశ జాతీయ అంతరిక్ష సంస్థ. దీని ప్రధాన కార్యాలయం కర్ణాటకలోని బెంగళూరులో ఉంది. ఇస్రో 1969లో స్థాపించబడింది మరియు చంద్రయాన్, మంగళయాన్ వంటి విజయవంతమైన అంతరిక్ష ప్రయోగాలను చేపట్టింది.",
+    "passage_en": "Indian Space Research Organisation (ISRO) is the national space agency of India. Its headquarters is located in Bengaluru, Karnataka. ISRO was established in 1969 and launched Chandrayaan and Mangalyaan."
+  },
+  {
+    "id": "msmarco_xi_en_004",
+    "language": "en",
+    "lang_name": "English",
+    "query": "How does vector search function in RAG systems?",
+    "answers": [
+      "Vector search converts text into dense embeddings and calculates cosine similarity to retrieve relevant passages."
+    ],
+    "passage": "Vector search in RAG transforms documents and user queries into numerical vectors (dense embeddings) using bi-encoder models. By measuring vector distances like Cosine Similarity or Inner Product, the retrieval engine quickly retrieves top-k matching document passages within milliseconds.",
+    "passage_en": "Vector search in RAG transforms documents and user queries into numerical vectors (dense embeddings) using bi-encoder models. By measuring vector distances like Cosine Similarity or Inner Product, the retrieval engine quickly retrieves top-k matching document passages within milliseconds."
+  },
+  {
+    "id": "msmarco_xi_ta_005",
+    "language": "ta",
+    "lang_name": "Tamil",
+    "query": "தமிழ்நாட்டின் தலைநகரம் எது?",
+    "query_en": "What is the capital of Tamil Nadu?",
+    "answers": [
+      "சென்னை தமிழ்நாட்டின் தலைநகரம் ஆகும்."
+    ],
+    "passage": "சென்னை தமிழ்நாட்டின் தலைநகரமும் மிகப்பெரிய நகரமும் ஆகும். இது வங்காள விரிகுடாவின் கொரமண்டலக் கரையில் அமைந்துள்ளது. சென்னை தென்னிந்தியாவின் கலாச்சார, பொருளாதார மற்றும் கல்வி மையங்களில் ஒன்றாகும்.",
+    "passage_en": "Chennai is the capital and largest city of Tamil Nadu. Located on the Coromandel Coast of the Bay of Bengal, it is a major cultural, economic, and educational hub in South India."
+  },
+  {
+    "id": "msmarco_xi_en_006",
+    "language": "en",
+    "lang_name": "English",
+    "query": "What are model guardrails in LLM pipelines?",
+    "answers": [
+      "Model guardrails are safety and verification rules that filter inappropriate inputs, prevent hallucinations, and reject ungrounded queries."
+    ],
+    "passage": "Model guardrails act as a defensive wrapper around LLMs. Pre-execution guardrails scan for off-topic, toxic, or prompt-injection attempts. Post-execution guardrails inspect the generated response for factual groundedness, ensuring the LLM does not hallucinate facts outside the retrieved dataset context.",
+    "passage_en": "Model guardrails act as a defensive wrapper around LLMs. Pre-execution guardrails scan for off-topic, toxic, or prompt-injection attempts. Post-execution guardrails inspect the generated response for factual groundedness, ensuring the LLM does not hallucinate facts outside the retrieved dataset context."
+  },
+  {
+    "id": "msmarco_xi_bn_007",
+    "language": "bn",
+    "lang_name": "Bengali",
+    "query": "রবীন্দ্রনাথ ঠাকুর কে ছিলেন?",
+    "query_en": "Who was Rabindranath Tagore?",
+    "answers": [
+      "রবীন্দ্রনাথ ঠাকুর ছিলেন একজন বিশ্বখ্যাত ভারতীয় বাঙালি কবি ও নোবেল বিজয়ী।"
+    ],
+    "passage": "রবীন্দ্রনাথ ঠাকুর ছিলেন বাংলা সাহিত্যের একজন প্রধান কবি, ঔপন্যাসিক, সংগীতস্রষ্টা ও দার্শনিক। ১৯১৩ সালে তাঁর গীতাঞ্জলি কাব্যগ্রন্থের জন্য তিনি সাহিত্যে নোবেল পুরস্কার লাভ করেন। তিনি ভারত ও বাংলাদেশের জাতীয় সংগীতের রচয়িতা।",
+    "passage_en": "Rabindranath Tagore was a world-famous Bengali poet and Nobel Laureate. In 1913, he won the Nobel Prize in Literature for Gitanjali. He composed the national anthems of both India and Bangladesh."
+  },
+  {
+    "id": "msmarco_xi_en_008",
+    "language": "en",
+    "lang_name": "English",
+    "query": "What is the sub-200ms latency requirement in real-time Voice RAG?",
+    "answers": [
+      "Sub-200ms latency requires ultra-fast vector retrieval, streaming speech-to-text, and optimized inference harnesses."
+    ],
+    "passage": "In voice-enabled RAG applications, maintaining an end-to-end latency below 200 milliseconds is essential for natural human conversation. This requires indexing documents into low-latency in-memory HNSW/FAISS vector structures, using fast asymmetric embeddings, and using low-overhead orchestration harnesses.",
+    "passage_en": "In voice-enabled RAG applications, maintaining an end-to-end latency below 200 milliseconds is essential for natural human conversation. This requires indexing documents into low-latency in-memory HNSW/FAISS vector structures, using fast asymmetric embeddings, and using low-overhead orchestration harnesses."
+  },
+  {
+    "id": "msmarco_xi_en_009",
+    "language": "en",
+    "lang_name": "English",
+    "query": "What is the difference between fixed-size and semantic chunking?",
+    "answers": [
+      "Fixed-size chunking splits text by token counts, while semantic chunking breaks text at natural sentence boundaries preserving context."
+    ],
+    "passage": "Fixed-size chunking breaks text into rigid segments of fixed token lengths with fixed character overlaps. In contrast, semantic chunking inspects sentence structures, punctuation boundaries, or semantic distance changes to ensure coherent complete ideas are retained inside individual vector chunks.",
+    "passage_en": "Fixed-size chunking breaks text into rigid segments of fixed token lengths with fixed character overlaps. In contrast, semantic chunking inspects sentence structures, punctuation boundaries, or semantic distance changes to ensure coherent complete ideas are retained inside individual vector chunks."
+  },
+  {
+    "id": "msmarco_xi_en_010",
+    "language": "en",
+    "lang_name": "English",
+    "query": "What is MS MARCO XI by AI4Bharat?",
+    "answers": [
+      "MS MARCO XI is a multilingual benchmark dataset created by AI4Bharat translating MS MARCO into 14 Indic languages."
+    ],
+    "passage": "MS MARCO XI is a large-scale multilingual retrieval dataset created by AI4Bharat. It extends the Microsoft MS MARCO dataset into 14 major Indic languages including Hindi, Bengali, Tamil, Telugu, Gujarati, Marathi, Malayalam, and Kannada, enabling research in cross-lingual search and Indic language RAG pipelines.",
+    "passage_en": "MS MARCO XI is a large-scale multilingual retrieval dataset created by AI4Bharat. It extends the Microsoft MS MARCO dataset into 14 major Indic languages including Hindi, Bengali, Tamil, Telugu, Gujarati, Marathi, Malayalam, and Kannada, enabling research in cross-lingual search and Indic language RAG pipelines."
+  }
+]
