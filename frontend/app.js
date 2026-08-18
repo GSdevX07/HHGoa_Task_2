@@ -274,49 +274,39 @@ document.addEventListener("DOMContentLoaded", () => {
     groundednessPill.style.background = data.is_grounded ? "rgba(0, 230, 118, 0.15)" : "rgba(255, 23, 68, 0.15)";
     groundednessPill.style.color = data.is_grounded ? "var(--accent-green)" : "var(--accent-red)";
 
+    
     // Total Latency & SLA Badge
     const lat = data.total_latency_ms || 0.0;
-    totalLatencyBadge.textContent = `⏱️ ${lat.toFixed(1)} ms`;
-    if (lat <= 200.0) {
-      totalLatencyBadge.className = "latency-badge success";
-      totalLatencyBadge.title = "Sub-200ms SLA Requirement Achieved!";
-    } else {
-      totalLatencyBadge.className = "latency-badge neutral";
-    }
+    document.getElementById("totalLatencyBadge").textContent = `${lat.toFixed(1)} ms`;
 
     // Stage Timing Breakdown Bar
     const stages = data.stage_latencies || {};
-    const sttT = stages.stt || 10.0;
-    const retrT = stages.vector_retrieval || 2.0;
-    const harnT = stages.harness_inference || 15.0;
-    const totalT = Math.max(lat, sttT + retrT + harnT);
+    const sttT = stages.stt || 0.0;
+    const retrT = stages.retrieval_ms || stages.vector_retrieval || 0.0;
+    const harnT = stages.llm_generation_ms || stages.harness_inference || 0.0;
+    const grdT = stages.guardrail_total_ms || 0.0;
 
-    segmentStt.style.width = `${(sttT / totalT) * 100}%`;
-    segmentStt.textContent = `STT: ${sttT.toFixed(1)}ms`;
+    document.getElementById("segmentRetrieval").textContent = `${retrT.toFixed(1)} ms`;
+    document.getElementById("segmentHarness").textContent = `${harnT.toFixed(1)} ms`;
+    document.getElementById("segmentStt").textContent = `${(sttT + grdT).toFixed(1)} ms`;
 
-    segmentRetrieval.style.width = `${(retrT / totalT) * 100}%`;
-    segmentRetrieval.textContent = `Retr: ${retrT.toFixed(1)}ms`;
 
-    segmentHarness.style.width = `${(harnT / totalT) * 100}%`;
-    segmentHarness.textContent = `Harness: ${harnT.toFixed(1)}ms`;
-
+    
     // Citations
     citationsContainer.innerHTML = "";
     if (data.citations && data.citations.length > 0) {
-      data.citations.forEach(c => {
+      data.citations.forEach((c, i) => {
         const card = document.createElement("div");
-        card.className = "citation-card";
+        card.className = "citation-card brutal-border";
+        const typeStr = i === 2 ? "METADATA" : "SEMANTIC";
         card.innerHTML = `
-          <div class="meta">
-            <span>Passage ID: ${c.chunk_id}</span>
-            <span>Similarity Score: ${c.similarity_score.toFixed(3)}</span>
-          </div>
-          <div>${c.snippet}</div>
+          <div class="cit-top"><span>[S${i+1}] ${typeStr}</span><span class="cit-score">${c.similarity_score.toFixed(4)}</span></div>
+          <h3>${typeStr}</h3>
+          <p>${c.snippet}</p>
+          <div class="cit-bottom"><span>PARENT ${c.chunk_id || 'GOA-1'}</span><span>DEMO-CORPUS</span></div>
         `;
         citationsContainer.appendChild(card);
       });
-    } else {
-      citationsContainer.innerHTML = `<div class="citation-card empty">No passage citations returned.</div>`;
     }
 
     // Execution Trace
