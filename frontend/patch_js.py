@@ -1,3 +1,4 @@
+
 import sys
 import re
 
@@ -6,7 +7,7 @@ with open(file_path, 'r', encoding='utf-8') as f:
     js = f.read()
 
 # Replace the citations logic to match the new brutalist classes
-citations_replacement = """
+citations_replacement = '''
     // Citations
     citationsContainer.innerHTML = "";
     if (data.citations && data.citations.length > 0) {
@@ -23,13 +24,13 @@ citations_replacement = """
         citationsContainer.appendChild(card);
       });
     }
-"""
+'''
 
-# Very careful regex
-js = re.sub(r'// Citations.*?\}\n', citations_replacement, js, flags=re.DOTALL)
+js = re.sub(r'// Citations.*?\} else \{.*?
+\s*\}', citations_replacement, js, flags=re.DOTALL)
 
 # Replace latency display
-latency_replacement = """
+latency_replacement = '''
     // Total Latency & SLA Badge
     const lat = data.total_latency_ms || 0.0;
     document.getElementById("totalLatencyBadge").textContent = `${lat.toFixed(1)} ms`;
@@ -44,9 +45,9 @@ latency_replacement = """
     document.getElementById("segmentRetrieval").textContent = `${retrT.toFixed(1)} ms`;
     document.getElementById("segmentHarness").textContent = `${harnT.toFixed(1)} ms`;
     document.getElementById("segmentStt").textContent = `${(sttT + grdT).toFixed(1)} ms`;
-"""
+'''
 
-js = re.sub(r'// Total Latency & SLA Badge.*?segmentHarness\.textContent = `Harness: \$\{harnT\.toFixed\(1\)\}ms`;', latency_replacement, js, flags=re.DOTALL)
+js = re.sub(r'// Total Latency & SLA Badge.*?segmentHarness.textContent = `Harness: \$\{harnT\.toFixed\(1\)\}ms`;', latency_replacement, js, flags=re.DOTALL)
 
 with open(file_path, 'w', encoding='utf-8') as f:
     f.write(js)

@@ -2,145 +2,338 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>VAANI RAG STUDIO GOA</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VAANI • RAG STUDIO GOA</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Space+Grotesk:wght@500;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div class="brutalist-container">
     
-    <!-- LEFT SIDEBAR -->
-    <div class="col-left">
+    <!-- ==========================================
+         LEFT SIDEBAR
+    =========================================== -->
+    <aside class="col-left">
+      <!-- Logo Header -->
       <div class="logo-area">
         <span class="logo-icon">✶</span>
         <div>
-          <h1 class="logo-text">VAANI</h1>
+          <h1 class="logo-title">VAANI</h1>
           <p class="logo-sub">RAG STUDIO • GOA</p>
         </div>
       </div>
 
-      <div class="brutal-box yellow-box tilt-box" style="position: relative;">
-        <span class="task-badge">TASK #02</span>
+      <!-- Tilted Yellow Sticky Card -->
+      <div class="sticky-note-card">
+        <span class="task-tag">TASK #02</span>
         <h2>VOICE-ENABLED<br>RAG MODEL</h2>
-        <p class="desc-text">Speak a question, get a grounded answer. Transcription, engineered chunking, vector retrieval, and generation — wired together end to end.</p>
+        <p class="sticky-desc">Speak a question, get a grounded answer. Transcription, engineered chunking, vector retrieval, and generation — wired together end to end.</p>
       </div>
 
+      <!-- Status Metadata Block -->
       <div class="status-area">
-        <div class="status-row"><span>STATUS</span> <span class="accent-green">READY</span></div>
-        <div class="status-desc">ELEVENLABS STT • ANTHROPIC PIPELINE/CLAUDE / CLAUDE-3-5-SONNET-20241022</div>
-        <div class="status-row"><span>DATE</span> <span>28-31 OCT 2026</span></div>
-        <div class="status-row"><span>TIME</span> <span>01:48 PM</span></div>
+        <div class="status-line">
+          <span>STATUS</span>
+          <span class="status-pill-green" id="sidebarStatusPill">READY</span>
+        </div>
+        <div class="pipeline-info" id="sidebarPipelineText">
+          SARVAM STT • GROQ LLAMA-3.3<br>PIPELINE: HYBRID RAG + RERANKER
+        </div>
+        <div class="status-line">
+          <span>DATE</span>
+          <span>28-31 OCT 2026</span>
+        </div>
+        <div class="status-line">
+          <span>TIME</span>
+          <span id="liveClockDisplay">01:48 PM</span>
+        </div>
       </div>
       
-      <div class="badges">
-        <span class="badge white-badge">SAFE BY DESIGN</span>
-        <span class="badge magenta-badge">NO HALLUCINATIONS +</span>
-      </div>
-    </div>
-
-    <!-- CENTER CONSOLE -->
-    <div class="col-center">
-      <div class="yellow-marquee brutal-border">
-        <span>+ TASK 02 + VOICE RAG</span>
-        <span>BUILD + LEARN + IMPACT</span>
-        <span>+ ASK THE INDEX</span>
-        <span>CHAI POWERED</span>
+      <!-- Badges -->
+      <div class="badges-row">
+        <span class="pill-badge pill-white">SAFE BY DESIGN</span>
+        <span class="pill-badge pill-magenta">NO HALLUCINATIONS •</span>
       </div>
 
-      <div class="console-box brutal-border bg-white">
-        <div class="console-header yellow-box brutal-border-bottom">
-          <span class="dot">●</span> ANSWERED WITH EVIDENCE
-          <h2 class="center-title">VOICE CONSOLE</h2>
-          <span class="req-id">REQ ID: C6FC997A</span>
+      <!-- Extra Sidebar Tools -->
+      <div class="sidebar-actions">
+        <button id="openBenchmarkModalBtn" class="side-btn">📊 N=50 LATENCY BENCHMARK</button>
+        <button id="openChunkingModalBtn" class="side-btn">🧩 CHUNKING EXPLORER</button>
+      </div>
+    </aside>
+
+    <!-- ==========================================
+         CENTER COLUMN (HERO CONSOLE)
+    =========================================== -->
+    <main class="col-center">
+      <!-- Top Yellow Ticker Bar -->
+      <div class="yellow-ticker">
+        <span class="ticker-item">• TASK 02 • VOICE RAG</span>
+        <span class="ticker-item">BUILD • LEARN • IMPACT</span>
+        <span class="ticker-item">• ASK THE INDEX</span>
+        <span class="ticker-item">CHAI POWERED</span>
+      </div>
+
+      <!-- Voice Console Card -->
+      <section class="console-card">
+        <div class="console-header">
+          <div class="header-status-dot">
+            <span class="red-indicator">●</span>
+            <span id="consoleStatusLabel">ANSWERED WITH EVIDENCE</span>
+          </div>
+          <h2>VOICE CONSOLE</h2>
+          <span class="req-id-badge" id="reqIdBadge">REQ ID: C6FC997A</span>
         </div>
 
         <div class="console-body">
-          <div class="recording-bar brutal-border">
-            <button id="recordBtn" class="record-btn bg-green brutal-border">
-              <span class="red-dot">●</span> <span id="recordBtnText">START RECORDING</span>
+          <!-- Start Recording Action Row -->
+          <div class="recording-bar">
+            <button id="recordBtn" class="record-btn">
+              <span class="rec-dot">●</span>
+              <span id="recordBtnText">START RECORDING</span>
             </button>
-            <div class="waveform" id="waveformVisualizer">|||||||||||||||||||</div>
-          </div>
-
-          <div class="mode-row">
-            <span class="label">RECOGNITION MODE</span>
-            <div class="mode-toggles">
-              <span class="toggle active bg-green">CLOUD STT</span>
-              <span class="toggle">BROWSER SPEECH</span>
+            <div class="waveform-area">
+              <canvas id="waveformCanvas" class="waveform-canvas"></canvas>
             </div>
           </div>
 
+          <!-- Mode Controls -->
+          <div class="mode-row">
+            <span class="mode-label">RECOGNITION MODE</span>
+            <div class="mode-toggle-group">
+              <button type="button" id="cloudSttToggle" class="mode-btn active">CLOUD STT</button>
+              <button type="button" id="browserSpeechToggle" class="mode-btn">BROWSER SPEECH</button>
+            </div>
+          </div>
+
+          <!-- Dropdown and Clear Row -->
           <div class="dropdown-row">
-            <select id="langSelect" class="brutal-input">
-              <option value="en">AUTO-DETECT LANGUAGE</option>
-              <option value="hi">HINDI</option>
+            <select id="langSelect" class="retro-select">
+              <option value="en">AUTO-DETECT LANGUAGE (EN/HI/MR/TA/TE)</option>
+              <option value="hi">HINDI (हिन्दी)</option>
+              <option value="en">ENGLISH</option>
+              <option value="mr">MARATHI (मराठी)</option>
+              <option value="ta">TAMIL (தமிழ்)</option>
+              <option value="te">TELUGU (తెలుగు)</option>
+              <option value="bn">BENGALI (বাংলা)</option>
+              <option value="gu">GUJARATI (ગુજરાતી)</option>
+              <option value="kn">KANNADA (ಕನ್ನಡ)</option>
             </select>
-            <button class="clear-btn brutal-input" onclick="document.getElementById('textInputQuery').value='';">CLEAR ↺</button>
+            <button type="button" id="clearInputBtn" class="retro-btn">CLEAR ↺</button>
+            
+            <!-- Hidden configuration elements -->
             <select id="chunkingSelect" style="display:none;"><option value="semantic">Semantic</option></select>
             <select id="headerSttSelect" style="display:none;"><option value="sarvam">Sarvam</option></select>
             <input type="checkbox" id="guardrailsToggle" checked style="display:none;">
           </div>
 
-          <div class="preview-box">
-            <span class="label">TRANSCRIPT PREVIEW</span>
-            <div class="transcript-text brutal-border" id="transcriptText">
-              Where is where is Goa
+          <!-- Transcript Preview Area -->
+          <div class="preview-group">
+            <span class="small-label">TRANSCRIPT PREVIEW</span>
+            <div class="transcript-card">
+              <span class="transcript-prefix">TRANSCRIPT</span>
+              <div class="transcript-body" id="transcriptText">Where is where is Goa</div>
             </div>
           </div>
 
+          <!-- Fallback Text Query Row -->
           <div class="query-fallback-row">
-            <input type="text" id="textInputQuery" class="brutal-input flex-grow" placeholder="TYPE YOUR QUERY FALLBACK HERE...">
-            <button id="submitQueryBtn" class="ask-btn brutal-border bg-black text-white">ASK +</button>
-            <button id="sampleQueryBtn" style="display:none;">Sample</button>
+            <input type="text" id="textInputQuery" class="query-input" placeholder="TYPE YOUR QUERY FALLBACK HERE...">
+            <button id="submitQueryBtn" class="ask-submit-btn">ASK ➔</button>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div class="answer-box brutal-border bg-white mt-20">
-        <div class="answer-header magenta-box brutal-border-bottom">
+      <!-- Live Grounded Answer Card -->
+      <section class="answer-card">
+        <div class="answer-header">
           <h2>LIVE GROUNDED ANSWER</h2>
-          <span class="status-right" id="groundednessPill">STATUS: WAITING</span>
+          <span class="answer-status-pill" id="groundednessPill">STATUS: ANSWERED WITH EVIDENCE</span>
         </div>
         <div class="answer-body">
-          <div class="answer-text brutal-border" id="answerContent">
-            Waiting for voice input...
+          <div class="answer-content-box">
+            <p id="answerContent">Based on the retrieved evidence: Goa is a state on the southwestern coast of India. <span class="citation-ref">[S1]</span></p>
           </div>
           
-          <div class="latency-boxes">
-            <div class="lat-box brutal-border"><span class="val" id="totalLatencyBadge">0.0 ms</span><span class="lbl">TOTAL</span></div>
-            <div class="lat-box brutal-border"><span class="val" id="segmentRetrieval">0.0 ms</span><span class="lbl">RETRIEVAL</span></div>
-            <div class="lat-box brutal-border"><span class="val" id="segmentHarness">0.0 ms</span><span class="lbl">GENERATION</span></div>
-            <div class="lat-box brutal-border"><span class="val" id="segmentStt">0.0 ms</span><span class="lbl">STT / GUARDRAILS</span></div>
+          <!-- 4 Latency Boxes Grid -->
+          <div class="latency-grid">
+            <div class="latency-cell">
+              <span class="latency-val" id="totalLatencyBadge">18.3 ms</span>
+              <span class="latency-lbl">TOTAL</span>
+            </div>
+            <div class="latency-cell">
+              <span class="latency-val" id="segmentRetrieval">16.0 ms</span>
+              <span class="latency-lbl">RETRIEVAL</span>
+            </div>
+            <div class="latency-cell">
+              <span class="latency-val" id="segmentHarness">0.2 ms</span>
+              <span class="latency-lbl">GENERATION</span>
+            </div>
+            <div class="latency-cell">
+              <span class="latency-val" id="segmentStt">2.0 ms</span>
+              <span class="latency-lbl">GUARDRAILS</span>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
 
-    <!-- RIGHT SIDEBAR -->
-    <div class="col-right">
-      <div class="right-header">
+    <!-- ==========================================
+         RIGHT SIDEBAR (02 / CITED EVIDENCE)
+    =========================================== -->
+    <aside class="col-right">
+      <div class="receipts-header">
         <span>02 / CITED EVIDENCE</span>
         <span>THE RECEIPTS</span>
       </div>
       
-      <div id="citationsContainer" class="citations-list">
-        <!-- Citations will be injected here by app.js -->
-        <div class="citation-card yellow-box brutal-border">
-          <div class="cit-top"><span>[S1] SEMANTIC</span><span class="cit-score">0.1664</span></div>
+      <div id="citationsContainer" class="citations-stack">
+        <!-- Citation Card 1 (Yellow) -->
+        <article class="receipt-card card-theme-yellow">
+          <div class="receipt-top-row">
+            <span class="receipt-badge">[S1] SEMANTIC</span>
+            <span class="receipt-score">0.1664</span>
+          </div>
           <h3>SEMANTIC</h3>
-          <p>Goa is a state on the southwestern coast of India.</p>
-          <div class="cit-bottom"><span>PARENT GOA-1</span><span>DEMO-CORPUS</span></div>
-        </div>
+          <p class="receipt-snippet">Goa is a state on the southwestern coast of India.</p>
+          <div class="receipt-bottom-row">
+            <span>PARENT: GOA-1</span>
+            <span>DEMO-CORPUS</span>
+          </div>
+        </article>
+
+        <!-- Citation Card 2 (Magenta) -->
+        <article class="receipt-card card-theme-magenta">
+          <div class="receipt-top-row">
+            <span class="receipt-badge">[S2] SEMANTIC</span>
+            <span class="receipt-score">0.1661</span>
+          </div>
+          <h3>SEMANTIC</h3>
+          <p class="receipt-snippet">Goa has a tropical monsoon climate.</p>
+          <div class="receipt-bottom-row">
+            <span>PARENT: GOA-4</span>
+            <span>DEMO-CORPUS</span>
+          </div>
+        </article>
+
+        <!-- Citation Card 3 (White/Cream) -->
+        <article class="receipt-card card-theme-white">
+          <div class="receipt-top-row">
+            <span class="receipt-badge">[S3] METADATA</span>
+            <span class="receipt-score">0.1636</span>
+          </div>
+          <h3>METADATA</h3>
+          <p class="receipt-snippet">Title: Goa geography Metadata: language: en | source: demo-corpus | topic: geography Content: Goa is a state on the southwestern coast of India. It borders the Arabian Sea and is known for its beaches,...</p>
+          <div class="receipt-bottom-row">
+            <span>PARENT: GOA-1</span>
+            <span>DEMO-CORPUS</span>
+          </div>
+        </article>
       </div>
+
+      <!-- Hidden compatibility anchors -->
       <div id="executionTraceContainer" style="display:none;"></div>
-      
-      <!-- Hidden buttons to prevent app.js from breaking -->
-      <button id="runBenchmarkBtn" style="display:none;"></button>
-      <button id="evalChunkingBtn" style="display:none;"></button>
       <button id="uploadAudioBtn" style="display:none;"></button>
       <input type="file" id="audioFileInput" style="display:none;">
+    </aside>
+
+  </div>
+
+  <!-- ==========================================
+       LATENCY BENCHMARK MODAL
+  =========================================== -->
+  <div id="benchmarkModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>LATENCY BENCHMARK SUITE (P50/P70/P100)</h2>
+        <button id="closeBenchmarkModalBtn" class="close-modal-btn">✕ CLOSE</button>
+      </div>
+      <div class="modal-body">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <p style="font-size: 13px; font-weight: bold;">Run automated N=50 queries over the AI4Bharat MSMARCO-XI corpus to verify sub-200ms SLA compliance.</p>
+          <button id="runBenchmarkBtn" class="ask-submit-btn" style="padding: 10px 20px;">▶ RUN N=50 BENCHMARK</button>
+        </div>
+
+        <div class="latency-grid">
+          <div class="latency-cell">
+            <span class="latency-val" id="statP50">-- ms</span>
+            <span class="latency-lbl">P50 (MEDIAN)</span>
+          </div>
+          <div class="latency-cell">
+            <span class="latency-val" id="statP70">-- ms</span>
+            <span class="latency-lbl">P70 (70TH %ILE)</span>
+          </div>
+          <div class="latency-cell">
+            <span class="latency-val" id="statP100">-- ms</span>
+            <span class="latency-lbl">P100 (MAX)</span>
+          </div>
+          <div class="latency-cell">
+            <span class="latency-val" id="statSlaRate" style="color:#0e6e3c;">-- %</span>
+            <span class="latency-lbl">SLA COMPLIANCE</span>
+          </div>
+        </div>
+
+        <div class="retro-table-wrap">
+          <table class="retro-table">
+            <thead>
+              <tr>
+                <th># Query</th>
+                <th>Test Question</th>
+                <th>STT (ms)</th>
+                <th>Vector DB (ms)</th>
+                <th>Harness (ms)</th>
+                <th>Total Latency</th>
+                <th>SLA Status</th>
+              </tr>
+            </thead>
+            <tbody id="benchmarkTableBody">
+              <tr>
+                <td colspan="7" style="text-align: center; padding: 20px; color: #666;">Click "Run N=50 Benchmark" to execute the real-time latency evaluation suite.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       CHUNKING EXPLORER MODAL
+  =========================================== -->
+  <div id="chunkingModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>VAST CHUNKING STRATEGY COMPARISON</h2>
+        <button id="closeChunkingModalBtn" class="close-modal-btn">✕ CLOSE</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <p style="font-size: 13px; font-weight: bold;">Compare Fixed-Window, Sentence-Aware, Semantic, and Parent-Child chunking on Indic text boundaries.</p>
+          <button id="evalChunkingBtn" class="ask-submit-btn" style="padding: 10px 20px;">⚡ EVALUATE CHUNKING</button>
+        </div>
+
+        <div class="retro-table-wrap">
+          <table class="retro-table">
+            <thead>
+              <tr>
+                <th>Strategy</th>
+                <th>Total Chunks</th>
+                <th>Avg Chunk Length (words)</th>
+                <th>Min / Max Length</th>
+                <th>Processing Time</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="chunkingComparisonTable">
+              <tr>
+                <td colspan="6" style="text-align: center; padding: 20px; color: #666;">Click "Evaluate Chunking" to benchmark all chunking strategies across the dataset.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 
