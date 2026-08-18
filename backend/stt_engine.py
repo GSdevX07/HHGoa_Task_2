@@ -59,27 +59,26 @@ class STTEngine:
                 res["latency_ms"] = round((time.perf_counter() - start_time) * 1000, 2)
                 return res
 
-        # Fallback processing if no API key is set
+        # No API keys configured — return an honest failure.
+        # The caller (voice endpoint in main.py) will handle this by:
+        #   a) returning a 422 with a clear message, OR
+        #   b) accepting a transcript_fallback form field for demo/testing mode.
         elapsed = round((time.perf_counter() - start_time) * 1000, 2)
-        logger.info(f"No active STT API keys set for {provider}. Utilizing spoken transcript transducer.")
-        
-        text_content = (transcript_fallback or "").strip()
-        if not text_content:
-            try:
-                text_content = audio_bytes.decode("utf-8").strip()
-            except Exception:
-                text_content = ""
-
-        if not text_content:
-            text_content = "What is Retrieval-Augmented Generation (RAG)?"
-
+        logger.warning(
+            f"STT provider '{provider}' has no API key configured. "
+            "Set SARVAM_API_KEY or ELEVENLABS_API_KEY in backend/.env"
+        )
         return {
-            "success": True,
-            "transcript": text_content,
-            "provider": f"{provider}_voice_transducer",
-            "latency_ms": max(elapsed, 12.5),
+            "success": False,
+            "transcript": "",
+            "provider": "none",
+            "latency_ms": round(elapsed, 2),
             "language": language_code,
-            "note": "Configure SARVAM_API_KEY or ELEVENLABS_API_KEY in .env for production STT API endpoint."
+            "error": (
+                f"No API key configured for STT provider '{provider}'. "
+                "Set SARVAM_API_KEY or ELEVENLABS_API_KEY in backend/.env to enable voice transcription. "
+                "Text queries via /api/query/text work without any STT keys."
+            ),
         }
 
     async def _transcribe_sarvam(self, audio_bytes: bytes, filename: str, language_code: str) -> Dict[str, Any]:

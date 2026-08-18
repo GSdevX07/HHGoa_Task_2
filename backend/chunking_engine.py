@@ -1,10 +1,20 @@
 """
-Vast Chunking Engine for MSMARCO-XI RAG System
-Implements multiple advanced chunking strategies:
-1. Fixed-Size Overlapping Window Chunking
-2. Semantic Boundary Chunking (Sentence / Danda aware)
-3. Metadata-Aware Hierarchical Chunking
-4. Parent-Child / Multi-Vector Chunking
+Chunking Engine for MSMARCO-XI RAG System
+==========================================
+Four advanced chunking strategies, all using word-token counts
+(not characters) for meaningful, consistent chunk sizing:
+
+  1. Fixed-token overlapping window
+  2. Semantic sentence-boundary chunking (Indic-aware)
+  3. Metadata-aware hierarchical chunking
+  4. Parent-child / multi-vector chunking
+
+Key design decisions:
+  - Chunk size measured in WORDS (≈ tokens), not characters
+  - Overlap measured as a fraction of chunk size
+  - Indic sentence boundaries (। ॥) handled natively
+  - Parent-child: child chunks are embedded for retrieval precision;
+    parent text is stored for LLM context richness
 """
 
 import re
@@ -14,206 +24,397 @@ from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger("chunking_engine")
 
+
+# ── Sentence Splitter ─────────────────────────────────────────────────────────
+
+# Matches end-of-sentence positions for:
+#   .  !  ?          — English / Latin scripts
+#   ।  ॥             — Devanagari (Hindi, Marathi, Sanskrit)
+#   ।  (same Unicode U+0964 / U+0965) used in Bengali, Gujarati, etc.
+_SENTENCE_END = re.compile(r'(?<=[.!?।॥])\s+')
+
+
+def _split_sentences(text: str) -> List[str]:
+    """Split text into sentences at natural boundaries."""
+    parts = _SENTENCE_END.split(text)
+    return [p.strip() for p in parts if p.strip()]
+
+
+def _word_count(text: str) -> int:
+    """Count whitespace-delimited tokens (words) in text."""
+    return len(text.split())
+
+
 class ChunkingEngine:
+    """
+    Multi-strategy document chunker with word-token-based sizing.
+
+    All strategies accept `chunk_size` (words) and `chunk_overlap`
+    (words, or computed as 10–20% of chunk_size when not supplied).
+    """
+
     def __init__(self):
-        # Regex for sentence boundaries supporting English (.!?) and Indic languages (।, ॥)
-        self.sentence_regex = re.compile(r'(?<=[.!?।॥])\s+')
+        # Default overlap = 15% of chunk_size; callers can override
+        self._default_overlap_ratio = 0.15
+
+    # ── Public API ────────────────────────────────────────────────────────────
 
     def chunk_documents(
         self,
         documents: List[Dict[str, Any]],
         strategy: str = "semantic",
-        chunk_size: int = 200,
-        chunk_overlap: int = 40
+        chunk_size: int = 256,          # words
+        chunk_overlap: Optional[int] = None,  # words; defaults to 15%
     ) -> List[Dict[str, Any]]:
         """
-        Main entry point for document chunking.
-        Strategies: 'fixed', 'semantic', 'metadata_aware', 'parent_child'
+        Chunk a list of documents using the specified strategy.
+
+        Args:
+            documents:     List of document dicts (from corpus.jsonl or built-ins).
+            strategy:      One of: 'fixed', 'semantic', 'metadata_aware', 'parent_child'.
+            chunk_size:    Target chunk size in words. Default: 256.
+            chunk_overlap: Overlap in words. Default: 15% of chunk_size.
+
+        Returns:
+            List of chunk dicts, each with keys:
+              chunk_id, text, parent_text, metadata
         """
-        start_time = time.perf_counter()
-        chunks = []
+        if chunk_overlap is None:
+            chunk_overlap = max(1, int(chunk_size * self._default_overlap_ratio))
+
+        t0 = time.perf_counter()
+        chunks: List[Dict[str, Any]] = []
 
         for doc in documents:
             doc_id = doc.get("id", "doc_unknown")
+            # Prefer the original (Indic) passage; fall back to English version
             text = doc.get("passage", "") or doc.get("passage_en", "")
+            text = text.strip()
+
+            if not text:
+                continue
+
             metadata = {
                 "doc_id": doc_id,
                 "language": doc.get("language", "en"),
                 "lang_name": doc.get("lang_name", "English"),
                 "query_context": doc.get("query", ""),
+                "query_en": doc.get("query_en", ""),
                 "answers": doc.get("answers", []),
-                "source": "ai4bharat/MSMARCO-XI"
+                "source": "ai4bharat/MSMARCO-XI",
+                "chunking_strategy": strategy,
+                "chunk_size_words": chunk_size,
+                "chunk_overlap_words": chunk_overlap,
             }
 
-            if not text.strip():
-                continue
-
             if strategy == "fixed":
-                doc_chunks = self._fixed_size_chunking(text, metadata, chunk_size, chunk_overlap)
+                doc_chunks = self._fixed_token_chunking(text, metadata, chunk_size, chunk_overlap)
             elif strategy == "semantic":
-                doc_chunks = self._semantic_boundary_chunking(text, metadata, chunk_size)
+                doc_chunks = self._semantic_boundary_chunking(text, metadata, chunk_size, chunk_overlap)
             elif strategy == "metadata_aware":
-                doc_chunks = self._metadata_aware_chunking(text, metadata, chunk_size)
+                doc_chunks = self._metadata_aware_chunking(text, metadata, chunk_size, chunk_overlap)
             elif strategy == "parent_child":
                 doc_chunks = self._parent_child_chunking(text, metadata, chunk_size)
             else:
-                doc_chunks = self._semantic_boundary_chunking(text, metadata, chunk_size)
+                logger.warning(f"Unknown strategy '{strategy}', falling back to 'semantic'.")
+                doc_chunks = self._semantic_boundary_chunking(text, metadata, chunk_size, chunk_overlap)
 
             chunks.extend(doc_chunks)
 
-        elapsed_ms = round((time.perf_counter() - start_time) * 1000, 3)
-        logger.info(f"Strategy '{strategy}' generated {len(chunks)} chunks from {len(documents)} docs in {elapsed_ms}ms")
+        elapsed_ms = round((time.perf_counter() - t0) * 1000, 3)
+        logger.info(
+            f"ChunkingEngine [{strategy}, sz={chunk_size}w, ov={chunk_overlap}w]: "
+            f"{len(documents)} docs → {len(chunks)} chunks in {elapsed_ms}ms"
+        )
         return chunks
 
-    def _fixed_size_chunking(
+    def compare_strategies(
+        self,
+        documents: List[Dict[str, Any]],
+        chunk_size: int = 256,
+    ) -> Dict[str, Any]:
+        """
+        Run all four strategies on `documents` and return comparison stats.
+        Used by the /api/chunking/compare endpoint.
+        """
+        strategies = ["fixed", "semantic", "metadata_aware", "parent_child"]
+        results = {}
+
+        for strategy in strategies:
+            t0 = time.perf_counter()
+            chunks = self.chunk_documents(documents, strategy=strategy, chunk_size=chunk_size)
+            elapsed_ms = round((time.perf_counter() - t0) * 1000, 3)
+
+            if chunks:
+                word_counts = [_word_count(c["text"]) for c in chunks]
+                avg_words = round(sum(word_counts) / len(word_counts), 1)
+                char_counts = [len(c["text"]) for c in chunks]
+                avg_chars = round(sum(char_counts) / len(char_counts), 1)
+            else:
+                word_counts = [0]
+                avg_words = 0
+                char_counts = [0]
+                avg_chars = 0
+
+            results[strategy] = {
+                "strategy": strategy,
+                "total_chunks": len(chunks),
+                "avg_words_per_chunk": avg_words,
+                "min_words": min(word_counts),
+                "max_words": max(word_counts),
+                "avg_chars_per_chunk": avg_chars,
+                "processing_ms": elapsed_ms,
+                "sample_chunks": [
+                    {
+                        "chunk_id": c["chunk_id"],
+                        "word_count": _word_count(c["text"]),
+                        "text_snippet": c["text"][:150] + ("..." if len(c["text"]) > 150 else ""),
+                    }
+                    for c in chunks[:3]
+                ],
+            }
+
+        return results
+
+    # ── Strategy 1: Fixed-Token Overlapping Window ────────────────────────────
+
+    def _fixed_token_chunking(
         self,
         text: str,
         metadata: Dict[str, Any],
         chunk_size: int,
-        chunk_overlap: int
+        chunk_overlap: int,
     ) -> List[Dict[str, Any]]:
-        """Splits text into fixed character blocks with specified overlap."""
+        """
+        Split text into overlapping windows of exactly `chunk_size` words.
+
+        This is the baseline strategy — fast and predictable, but agnostic
+        to sentence and paragraph boundaries.
+        """
+        words = text.split()
+        if not words:
+            return []
+
         chunks = []
         start = 0
-        text_len = len(text)
         chunk_idx = 0
+        step = max(1, chunk_size - chunk_overlap)
 
-        while start < text_len:
-            end = min(start + chunk_size, text_len)
-            chunk_text = text[start:end]
-            
+        while start < len(words):
+            end = min(start + chunk_size, len(words))
+            chunk_words = words[start:end]
+            chunk_text = " ".join(chunk_words)
+
             chunks.append({
-                "chunk_id": f"{metadata['doc_id']}_fixed_{chunk_idx}",
+                "chunk_id": f"{metadata['doc_id']}_fixed_{chunk_idx:04d}",
                 "text": chunk_text,
-                "metadata": {**metadata, "strategy": "fixed", "chunk_idx": chunk_idx, "char_start": start, "char_end": end},
-                "parent_text": text
+                "parent_text": text,
+                "metadata": {
+                    **metadata,
+                    "chunk_idx": chunk_idx,
+                    "word_start": start,
+                    "word_end": end,
+                    "word_count": len(chunk_words),
+                },
             })
-            
-            if end >= text_len:
+
+            if end >= len(words):
                 break
-            start += (chunk_size - chunk_overlap)
+            start += step
             chunk_idx += 1
 
         return chunks
+
+    # ── Strategy 2: Semantic Sentence-Boundary Chunking ───────────────────────
 
     def _semantic_boundary_chunking(
         self,
         text: str,
         metadata: Dict[str, Any],
-        target_size: int
+        target_words: int,
+        overlap_words: int,
     ) -> List[Dict[str, Any]]:
-        """Splits text at natural sentence boundaries (supporting Indic punctuation '।' and '॥')."""
-        sentences = self.sentence_regex.split(text)
+        """
+        Split text at natural sentence boundaries (English + Indic punctuation).
+
+        Accumulates sentences until the target word count is reached,
+        then starts a new chunk. Overlap is implemented by carrying forward
+        the last `overlap_words` words of the previous chunk as a prefix.
+
+        This preserves semantic coherence — no mid-sentence cuts.
+        """
+        sentences = _split_sentences(text)
+        if not sentences:
+            return self._fixed_token_chunking(text, metadata, target_words, overlap_words)
+
         chunks = []
-        current_chunk_sentences = []
-        current_len = 0
+        current_sentences: List[str] = []
+        current_words = 0
         chunk_idx = 0
+        # Words carried over from the previous chunk for overlap
+        overlap_prefix: List[str] = []
+
+        def _flush(sentences_list: List[str], prefix: List[str]) -> str:
+            all_words = prefix + " ".join(sentences_list).split()
+            return " ".join(all_words)
 
         for sentence in sentences:
-            sentence = sentence.strip()
-            if not sentence:
-                continue
+            s_words = _word_count(sentence)
 
-            sentence_len = len(sentence)
-            if current_len + sentence_len > target_size and current_chunk_sentences:
-                chunk_text = " ".join(current_chunk_sentences)
+            # If adding this sentence would exceed the target, emit current chunk
+            if current_words + s_words > target_words and current_sentences:
+                chunk_text = _flush(current_sentences, overlap_prefix)
                 chunks.append({
-                    "chunk_id": f"{metadata['doc_id']}_semantic_{chunk_idx}",
+                    "chunk_id": f"{metadata['doc_id']}_semantic_{chunk_idx:04d}",
                     "text": chunk_text,
-                    "metadata": {**metadata, "strategy": "semantic", "chunk_idx": chunk_idx, "sentence_count": len(current_chunk_sentences)},
-                    "parent_text": text
+                    "parent_text": text,
+                    "metadata": {
+                        **metadata,
+                        "chunk_idx": chunk_idx,
+                        "sentence_count": len(current_sentences),
+                        "word_count": _word_count(chunk_text),
+                    },
                 })
                 chunk_idx += 1
-                current_chunk_sentences = []
-                current_len = 0
 
-            current_chunk_sentences.append(sentence)
-            current_len += sentence_len + 1
+                # Build overlap prefix from end of this chunk
+                all_chunk_words = chunk_text.split()
+                overlap_prefix = all_chunk_words[-overlap_words:] if overlap_words > 0 else []
+                current_sentences = []
+                current_words = 0
 
-        if current_chunk_sentences:
-            chunk_text = " ".join(current_chunk_sentences)
+            current_sentences.append(sentence)
+            current_words += s_words
+
+        # Flush remaining sentences
+        if current_sentences:
+            chunk_text = _flush(current_sentences, overlap_prefix)
             chunks.append({
-                "chunk_id": f"{metadata['doc_id']}_semantic_{chunk_idx}",
+                "chunk_id": f"{metadata['doc_id']}_semantic_{chunk_idx:04d}",
                 "text": chunk_text,
-                "metadata": {**metadata, "strategy": "semantic", "chunk_idx": chunk_idx, "sentence_count": len(current_chunk_sentences)},
-                "parent_text": text
+                "parent_text": text,
+                "metadata": {
+                    **metadata,
+                    "chunk_idx": chunk_idx,
+                    "sentence_count": len(current_sentences),
+                    "word_count": _word_count(chunk_text),
+                },
             })
 
         return chunks
+
+    # ── Strategy 3: Metadata-Aware Chunking ───────────────────────────────────
 
     def _metadata_aware_chunking(
         self,
         text: str,
         metadata: Dict[str, Any],
-        target_size: int
+        target_words: int,
+        overlap_words: int,
     ) -> List[Dict[str, Any]]:
-        """Prepends document metadata context header into chunk embedding text to enrich semantic search."""
-        base_chunks = self._semantic_boundary_chunking(text, metadata, target_size)
-        header_prefix = f"[{metadata['lang_name']} Corpus | ID: {metadata['doc_id']} | Query: {metadata['query_context']}] "
+        """
+        Semantic chunking with a metadata context prefix injected into the
+        embedded text.
 
-        enriched_chunks = []
-        for idx, chk in enumerate(base_chunks):
-            enriched_text = header_prefix + chk["text"]
-            enriched_chunks.append({
-                "chunk_id": f"{metadata['doc_id']}_meta_{idx}",
-                "text": enriched_text,
-                "raw_text": chk["text"],
-                "metadata": {**metadata, "strategy": "metadata_aware", "has_header": True},
-                "parent_text": text
+        The prefix encodes document-level signals (language, corpus source,
+        query context) into the embedding, improving retrieval precision for
+        multilingual and cross-lingual queries.
+
+        The LLM always receives the raw chunk text WITHOUT the prefix
+        (stored in 'raw_text') to avoid polluting the generation context.
+        """
+        # Build prefix (kept short to avoid dominating the embedding)
+        lang = metadata.get("lang_name", "")
+        doc_id = metadata.get("doc_id", "")
+        query_ctx = (metadata.get("query_context") or metadata.get("query_en") or "")[:80]
+        prefix = f"[{lang} | MSMARCO-XI | {doc_id} | {query_ctx}] "
+
+        # Get base semantic chunks
+        base_chunks = self._semantic_boundary_chunking(text, metadata, target_words, overlap_words)
+
+        enriched = []
+        for idx, chunk in enumerate(base_chunks):
+            enriched_text = prefix + chunk["text"]
+            enriched.append({
+                "chunk_id": f"{metadata['doc_id']}_metaaware_{idx:04d}",
+                "text": enriched_text,          # Used for embedding
+                "raw_text": chunk["text"],       # Used for LLM context
+                "parent_text": text,
+                "metadata": {
+                    **chunk["metadata"],
+                    "chunking_strategy": "metadata_aware",
+                    "has_metadata_prefix": True,
+                    "prefix": prefix,
+                },
             })
 
-        return enriched_chunks
+        return enriched
+
+    # ── Strategy 4: Parent-Child / Multi-Vector Chunking ─────────────────────
 
     def _parent_child_chunking(
         self,
         text: str,
         metadata: Dict[str, Any],
-        parent_size: int
+        parent_size_words: int,
     ) -> List[Dict[str, Any]]:
-        """Creates small fine-grained child chunks for high precision retrieval linked to parent passage."""
-        child_size = max(60, parent_size // 3)
-        child_chunks_raw = self._fixed_size_chunking(text, metadata, child_size, chunk_overlap=15)
+        """
+        Two-level chunking:
+          - Parent chunks: ~parent_size_words, semantic boundaries
+            → stored as context for the LLM
+          - Child chunks: ~1/3 of parent size, fixed-token
+            → embedded and retrieved with high precision
 
-        chunks = []
-        for idx, chk in enumerate(child_chunks_raw):
-            chunks.append({
-                "chunk_id": f"{metadata['doc_id']}_parent_child_{idx}",
-                "text": chk["text"], # Fine-grained chunk for vector embedding lookup
-                "metadata": {
-                    **metadata,
-                    "strategy": "parent_child",
-                    "child_idx": idx,
-                    "is_child": True
-                },
-                "parent_text": text # Full parent context returned for LLM answer generation
-            })
+        This gives the best of both worlds:
+          - High recall: small child chunks → precise embedding matches
+          - Rich context: parent passage → better LLM answers
+          - Low hallucination: LLM sees full sentence context, not a fragment
 
-        return chunks
+        The reranker scores using parent_text (see reranker.py) for even
+        richer signal, then returns child chunk for citation accuracy.
+        """
+        child_size = max(32, parent_size_words // 3)
+        child_overlap = max(1, child_size // 5)
 
-    def compare_strategies(self, documents: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Runs and evaluates all 4 chunking strategies on the corpus for analytics and visual benchmarking."""
-        strategies = ["fixed", "semantic", "metadata_aware", "parent_child"]
-        results = {}
+        # Step 1: build parent chunks using semantic boundaries
+        parent_chunks = self._semantic_boundary_chunking(
+            text, metadata, parent_size_words, max(1, parent_size_words // 10)
+        )
 
-        for strat in strategies:
-            st = time.perf_counter()
-            chunks = self.chunk_documents(documents, strategy=strat)
-            elapsed_ms = round((time.perf_counter() - st) * 1000, 3)
+        all_child_chunks = []
 
-            lengths = [len(c["text"]) for c in chunks] if chunks else [0]
-            avg_len = round(sum(lengths) / len(lengths), 1) if lengths else 0
-            
-            results[strat] = {
-                "strategy_name": strat,
-                "total_chunks": len(chunks),
-                "avg_chunk_length": avg_len,
-                "min_chunk_length": min(lengths),
-                "max_chunk_length": max(lengths),
-                "processing_time_ms": elapsed_ms,
-                "sample_chunks": [
-                    {"chunk_id": c["chunk_id"], "text_snippet": c["text"][:120] + "..."}
-                    for c in chunks[:3]
-                ]
-            }
+        for p_idx, parent in enumerate(parent_chunks):
+            parent_text = parent["text"]
+            parent_word_count = _word_count(parent_text)
 
-        return results
+            # Step 2: split parent into child chunks (fixed-token within parent)
+            parent_words = parent_text.split()
+            step = max(1, child_size - child_overlap)
+            c_idx = 0
+            start = 0
+
+            while start < len(parent_words):
+                end = min(start + child_size, len(parent_words))
+                child_text = " ".join(parent_words[start:end])
+
+                all_child_chunks.append({
+                    "chunk_id": f"{metadata['doc_id']}_parchild_{p_idx:03d}_{c_idx:04d}",
+                    "text": child_text,              # Embedded for retrieval
+                    "parent_text": parent_text,      # Given to LLM for answering
+                    "metadata": {
+                        **metadata,
+                        "chunking_strategy": "parent_child",
+                        "parent_idx": p_idx,
+                        "child_idx": c_idx,
+                        "parent_word_count": parent_word_count,
+                        "child_word_count": len(child_text.split()),
+                        "is_child": True,
+                    },
+                })
+
+                if end >= len(parent_words):
+                    break
+                start += step
+                c_idx += 1
+
+        return all_child_chunks
