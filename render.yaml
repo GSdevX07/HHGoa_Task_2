@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: voice-rag-app
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: SARVAM_API_KEY
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: STT_PROVIDER
+        value: sarvam
+      - key: EMBEDDING_MODEL
+        value: all-MiniLM-L6-v2
+      - key: RERANKER_MODEL
+        value: BAAI/bge-reranker-v2-m3
+      - key: RERANKER_ENABLED
+        value: "true"
+      - key: RETRIEVAL_CANDIDATE_POOL
+        value: "20"
+      - key: RERANKER_TOP_K
+        value: "3"
+      - key: RETRIEVAL_THRESHOLD
+        value: "0.15"

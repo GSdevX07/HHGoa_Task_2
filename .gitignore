@@ -20,11 +20,13 @@ ENV/
 backend/.env
 .env
 
-# Generated indexes (large binary files — regenerate with build_index.py)
+# Downloaded raw files (large gdrive archives)
+data/gdrive_download/
+
+# Generated indexes (binary files)
 indexes/
 
-# Downloaded corpus (regenerate with download_dataset.py)
-data/
+
 
 # Old benchmark reports (regenerate with run_benchmark.py)
 benchmark_report.json
