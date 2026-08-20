@@ -22,12 +22,13 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy backend, frontend, scripts, indexes, and data
+# Copy backend, frontend, scripts, and data
 COPY backend/ ./backend/
 COPY frontend/ ./frontend/
 COPY scripts/ ./scripts/
-COPY indexes/ ./indexes/
 COPY data/ ./data/
+RUN mkdir -p indexes
+
 
 # Expose default port (Render/Railway use $PORT; Hugging Face uses 7860; default is 8000)
 EXPOSE 8000 7860
