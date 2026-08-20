@@ -93,52 +93,151 @@ def extract_answers(item: dict) -> list:
 
 # ── Main Download Logic ────────────────────────────────────────────────────────
 
+def _extract_passage_msmarco_xi(raw: dict) -> str:
+    """
+    Extract best passage from MSMARCO-XI nested passages struct.
+    Schema: passages = { English_passages: list[str], is_selected: list[int] }
+    """
+    passages_field = raw.get("passages", None)
+    if isinstance(passages_field, dict):
+        eng = passages_field.get("English_passages", []) or []
+        sel = passages_field.get("is_selected", []) or []
+        for i, s in enumerate(sel):
+            if s == 1 and i < len(eng) and eng[i]:
+                return normalize_text(eng[i])
+        if eng and eng[0]:
+            return normalize_text(eng[0])
+    for field in ("passage", "passage_text", "passage_en"):
+        v = raw.get(field, "")
+        if v:
+            return normalize_text(v)
+    return ""
+
+
 def download_language(lang_code: str, limit: int) -> list:
-    """Download up to `limit` documents for one language split."""
-    logger.info(f"Downloading lang={lang_code}, limit={limit} ...")
+    """
+    Download up to `limit` docs for one language using the HuggingFace
+    Datasets Server REST API — avoids streaming 16 GB of parquet shards.
+
+    API docs: https://huggingface.co/docs/dataset-viewer/en/rows
+    Filters by source_lang to get only the target language rows.
+    Falls back to single-shard streaming if the API is unavailable.
+    """
+    logger.info(f"Downloading lang={lang_code}, limit={limit} via Datasets Server API ...")
     items = []
 
+    # ── Method 1: Datasets Server API (fast — no large downloads) ────────────
+    try:
+        import requests
+        base_url = "https://datasets-server.huggingface.co/rows"
+        offset = 0
+        page_size = 100  # max per request
+
+        while len(items) < limit:
+            fetch = min(page_size, limit - len(items))
+            params = {
+                "dataset": "ai4bharat/MSMARCO-XI",
+                "config": "default",
+                "split": "validation",
+                "offset": offset,
+                "length": fetch,
+                "filter": f'source_lang="{lang_code}"',
+            }
+            resp = requests.get(base_url, params=params, timeout=30)
+
+            if resp.status_code == 200:
+                data = resp.json()
+                rows = data.get("rows", [])
+                if not rows:
+                    break  # no more rows
+
+                for row_wrapper in rows:
+                    raw = row_wrapper.get("row", row_wrapper)
+                    passage = _extract_passage_msmarco_xi(raw)
+                    if not passage:
+                        continue
+                    query_native = normalize_text(raw.get("query", ""))
+                    query_en     = normalize_text(raw.get("Eng_Query", ""))
+                    if not query_native and not query_en:
+                        continue
+                    answer    = normalize_text(raw.get("Answer", "") or "")
+                    answer_en = normalize_text(raw.get("Eng_Answer", "") or "")
+                    answers   = [a for a in [answer, answer_en] if a]
+                    items.append({
+                        "id":        f"msmarco_xi_{lang_code}_{len(items):05d}",
+                        "language":  lang_code,
+                        "lang_name": LANG_NAMES.get(lang_code, lang_code.upper()),
+                        "query":     query_native or query_en,
+                        "query_en":  query_en,
+                        "answers":   answers,
+                        "passage":   passage,
+                    })
+
+                offset += len(rows)
+                logger.info(f"  [{lang_code}] fetched {len(items)}/{limit} via API ...")
+
+                if len(rows) < fetch:
+                    break  # last page
+
+            elif resp.status_code == 400:
+                # Filter param may not be supported — fall through to streaming
+                logger.warning(f"  [{lang_code}] API filter not supported (400), trying streaming ...")
+                break
+            else:
+                logger.warning(f"  [{lang_code}] API returned {resp.status_code}, trying streaming ...")
+                break
+
+        if items:
+            logger.info(f"  [{lang_code}] Downloaded {len(items)} docs via API.")
+            return items
+
+    except Exception as e:
+        logger.warning(f"  [{lang_code}] API method failed: {e}. Falling back to single-shard streaming.")
+
+    # ── Method 2: Stream only the first parquet shard (fallback) ────────────
+    # Much faster than streaming the full split — shard 0000 is ~1.2 GB
+    # but we stop as soon as we have `limit` matching rows.
     try:
         from datasets import load_dataset
-        # Streaming avoids downloading the entire split before iterating
-        # Use 'default' config and filter by language, and remove deprecated trust_remote_code
-        ds = load_dataset(
-            "ai4bharat/MSMARCO-XI",
-            "default",
-            split="train",
-            streaming=True,
+        logger.info(f"  [{lang_code}] Streaming shard 0000.parquet ...")
+        shard_url = (
+            "hf://datasets/ai4bharat/MSMARCO-XI@refs/convert/parquet"
+            "/default/validation/0000.parquet"
         )
+        ds = load_dataset("parquet", data_files={"validation": shard_url},
+                          split="validation", streaming=True)
         count = 0
         for raw in ds:
-            # Check if this row matches the target language
-            row_lang = raw.get("language", "")
+            row_lang = raw.get("source_lang", raw.get("language", ""))
             if row_lang and row_lang != lang_code:
                 continue
-
-            passage = normalize_text(extract_passage_text(raw))
-            query = normalize_text(raw.get("query", ""))
-            if not passage or not query:
+            passage = _extract_passage_msmarco_xi(raw)
+            if not passage:
                 continue
-
+            query_native = normalize_text(raw.get("query", ""))
+            query_en     = normalize_text(raw.get("Eng_Query", ""))
+            if not query_native and not query_en:
+                continue
+            answer    = normalize_text(raw.get("Answer", "") or "")
+            answer_en = normalize_text(raw.get("Eng_Answer", "") or "")
+            answers   = [a for a in [answer, answer_en] if a]
             items.append({
-                "id": f"msmarco_hf_{lang_code}_{count:05d}",
-                "language": lang_code,
+                "id":        f"msmarco_xi_{lang_code}_{count:05d}",
+                "language":  lang_code,
                 "lang_name": LANG_NAMES.get(lang_code, lang_code.upper()),
-                "query": query,
-                "query_en": normalize_text(raw.get("query_en", "")),
-                "answers": extract_answers(raw),
-                "passage": passage,
-                "passage_en": normalize_text(raw.get("passage_en", "")),
+                "query":     query_native or query_en,
+                "query_en":  query_en,
+                "answers":   answers,
+                "passage":   passage,
             })
             count += 1
             if count >= limit:
                 break
+        logger.info(f"  [{lang_code}] Downloaded {len(items)} docs via shard streaming.")
 
-        logger.info(f"  [{lang_code}] Downloaded {len(items)} documents.")
     except Exception as e:
-        logger.warning(f"  [{lang_code}] HuggingFace download failed: {e}")
-        logger.warning(f"  [{lang_code}] This language will be skipped. "
-                       "Ensure HuggingFace datasets library is installed and network is available.")
+        logger.warning(f"  [{lang_code}] Streaming fallback failed: {e}")
+        logger.warning(f"  [{lang_code}] Skipping. Try: pip install -U datasets pyarrow requests")
 
     return items
 

@@ -12,6 +12,11 @@ import time
 from collections import OrderedDict
 from typing import List, Dict, Any, Optional, Tuple
 
+# Force PyTorch backend and disable TensorFlow/Keras 3 hooks in Transformers
+os.environ["USE_TF"] = "0"
+os.environ["USE_TORCH"] = "1"
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+
 import numpy as np
 
 logger = logging.getLogger("retrieval.dense")

@@ -15,7 +15,9 @@ Why RRF instead of a weighted score sum?
 import os
 import logging
 import time
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
+
+import numpy as np
 
 from .dense import DenseRetriever
 from .bm25 import BM25Retriever

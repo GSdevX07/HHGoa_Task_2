@@ -86,19 +86,23 @@ class ChunkingEngine:
         chunks: List[Dict[str, Any]] = []
 
         for doc in documents:
-            doc_id = doc.get("id", "doc_unknown")
-            # Prefer the original (Indic) passage; fall back to English version
-            text = doc.get("passage", "") or doc.get("passage_en", "")
+            doc_id = doc.get("id") or doc.get("passage_id") or doc.get("doc_id") or "doc_unknown"
+            # Support both 'text' (official dataset) and 'passage' / 'passage_en' (legacy/built-in)
+            text = doc.get("text", "") or doc.get("passage", "") or doc.get("passage_en", "")
             text = text.strip()
 
             if not text:
                 continue
 
+            lang_code = doc.get("language") or doc.get("source_lang") or "en"
+            lang_map = {"hi": "Hindi", "en": "English", "mr": "Marathi", "te": "Telugu", "ta": "Tamil", "bn": "Bengali"}
+            lang_name = doc.get("lang_name") or lang_map.get(lang_code, lang_code.upper())
+
             metadata = {
                 "doc_id": doc_id,
-                "language": doc.get("language", "en"),
-                "lang_name": doc.get("lang_name", "English"),
-                "query_context": doc.get("query", ""),
+                "language": lang_code,
+                "lang_name": lang_name,
+                "query_context": doc.get("query", "") or doc.get("title", ""),
                 "query_en": doc.get("query_en", ""),
                 "answers": doc.get("answers", []),
                 "source": "ai4bharat/MSMARCO-XI",

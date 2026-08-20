@@ -104,6 +104,7 @@ class BenchmarkAnalytics:
         p50  = float(np.percentile(arr, 50))
         p70  = float(np.percentile(arr, 70))
         p95  = float(np.percentile(arr, 95))
+        p99  = float(np.percentile(arr, 99))
         p100 = float(np.max(arr))
         mean = float(np.mean(arr))
         std  = float(np.std(arr))
@@ -117,6 +118,7 @@ class BenchmarkAnalytics:
             "p50_ms": round(p50, 2),
             "p70_ms": round(p70, 2),
             "p95_ms": round(p95, 2),
+            "p99_ms": round(p99, 2),
             "p100_ms": round(p100, 2),
             "mean_ms": round(mean, 2),
             "min_ms": round(p0, 2),
@@ -127,6 +129,7 @@ class BenchmarkAnalytics:
             "sla_p50_met": p50 <= sla_target_ms,
             "sla_p70_met": p70 <= sla_target_ms,
             "sla_p95_met": p95 <= sla_target_ms,
+            "sla_p99_met": p99 <= sla_target_ms,
             "sla_p100_met": p100 <= sla_target_ms,
             "sla_full_distribution_met": compliance == 100.0,
             "raw_samples_ms": [round(float(x), 2) for x in sorted_arr],
@@ -182,12 +185,13 @@ class BenchmarkAnalytics:
         # ── SLA verdict ───────────────────────────────────────────────────────
         p50_met  = overall["sla_p50_met"]
         p70_met  = overall["sla_p70_met"]
+        p99_met  = overall.get("sla_p99_met", True)
         p100_met = overall["sla_p100_met"]
 
-        if p50_met and p70_met and p100_met:
+        if p50_met and p70_met and p99_met and p100_met:
             sla_verdict = "PASS — full distribution meets sub-200ms SLA"
         elif p50_met and p70_met:
-            sla_verdict = "PARTIAL — P50 and P70 meet SLA; P100 exceeds"
+            sla_verdict = "PARTIAL — P50 and P70 meet SLA; tail latency exceeds"
         elif p50_met:
             sla_verdict = "PARTIAL — P50 meets SLA; tail latency exceeds"
         else:
@@ -205,6 +209,7 @@ class BenchmarkAnalytics:
                 "p50_total_ms": overall["p50_ms"],
                 "p70_total_ms": overall["p70_ms"],
                 "p95_total_ms": overall["p95_ms"],
+                "p99_total_ms": overall.get("p99_ms", overall["p95_ms"]),
                 "p100_total_ms": overall["p100_ms"],
                 "mean_total_ms": overall["mean_ms"],
                 "sla_compliance_pct": overall["sla_compliance_pct"],
@@ -212,6 +217,7 @@ class BenchmarkAnalytics:
                 "sla_p50_met": p50_met,
                 "sla_p70_met": p70_met,
                 "sla_p95_met": overall["sla_p95_met"],
+                "sla_p99_met": p99_met,
                 "sla_p100_met": p100_met,
             },
             "pipeline_only_stats": {
@@ -219,6 +225,7 @@ class BenchmarkAnalytics:
                 "p50_ms": pipeline_stats["p50_ms"],
                 "p70_ms": pipeline_stats["p70_ms"],
                 "p95_ms": pipeline_stats["p95_ms"],
+                "p99_ms": pipeline_stats.get("p99_ms", pipeline_stats["p95_ms"]),
                 "p100_ms": pipeline_stats["p100_ms"],
             },
             "stage_breakdown": {
@@ -231,3 +238,69 @@ class BenchmarkAnalytics:
             "detailed_stats": overall,
             "sample_runs": runs[:10],  # First 10 runs for inspection
         }
+
+    # ── Integrity Check ───────────────────────────────────────────────────────
+
+    @staticmethod
+    def integrity_check(
+        dense_model_loaded: bool,
+        reranker_loaded: bool,
+        reranker_enabled: bool,
+        index_source: str,
+        unique_query_count: int,
+        total_query_count: int,
+        cache_cleared: bool,
+    ) -> List[str]:
+        """
+        Inspect a benchmark configuration and return a list of human-readable
+        warnings about measurement validity.
+
+        Returns an empty list if the configuration is clean.
+        """
+        warnings: List[str] = []
+
+        if not dense_model_loaded:
+            warnings.append(
+                "CRITICAL: SentenceTransformer model NOT loaded — using hash-based "
+                "fallback embedding. All latency numbers are INVALID for neural retrieval."
+            )
+
+        if reranker_enabled and not reranker_loaded:
+            warnings.append(
+                "WARNING: Reranker was enabled but failed to load — fell back to RRF ranking. "
+                "Reranker latency numbers are RRF latency, not BGE cross-encoder latency."
+            )
+
+        if not reranker_enabled:
+            warnings.append(
+                "NOTE: Reranker is DISABLED (RERANKER_ENABLED=false). "
+                "Reranker latency = RRF fallback only. BGE cross-encoder was NOT benchmarked."
+            )
+
+        if index_source == "in-memory":
+            warnings.append(
+                "WARNING: Index was built in-memory from corpus (not loaded from disk). "
+                "This may differ from the production index configuration."
+            )
+        elif index_source == "builtin_samples":
+            warnings.append(
+                "CRITICAL: Running on built-in sample corpus. This is DEMO MODE, "
+                "not a production benchmark."
+            )
+
+        if not cache_cleared:
+            warnings.append(
+                "NOTE: Dense LRU query cache was NOT cleared between queries. "
+                "Results include cache-hit speedups and are NOT cold-cache latency."
+            )
+
+        if unique_query_count < total_query_count:
+            repeat_factor = round(total_query_count / unique_query_count, 1)
+            warnings.append(
+                f"NOTE: Only {unique_query_count} unique queries available; "
+                f"padded to {total_query_count} ({repeat_factor}x repetition). "
+                f"Repeated queries may benefit from LRU cache even after initial clear."
+            )
+
+        return warnings
+
