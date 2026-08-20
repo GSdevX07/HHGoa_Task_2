@@ -51,8 +51,12 @@ class DenseRetriever:
     def _init_model(self):
         """Load SentenceTransformer; gracefully skip if unavailable."""
         try:
+            import torch
+            torch.set_num_threads(4)
+            torch.set_grad_enabled(False)
             from sentence_transformers import SentenceTransformer
             self.model = SentenceTransformer(self.model_name)
+            self.model.eval()
             self.vector_dim = self.model.get_sentence_embedding_dimension()
             logger.info(f"DenseRetriever: loaded model '{self.model_name}' (dim={self.vector_dim})")
         except Exception as exc:
@@ -178,12 +182,23 @@ class DenseRetriever:
             return np.zeros((0, self.vector_dim), dtype=np.float32)
 
         if self.model is not None:
-            return self.model.encode(
-                texts,
-                batch_size=128,
-                normalize_embeddings=True,
-                convert_to_numpy=True,
-            ).astype(np.float32)
+            try:
+                import torch
+                torch.set_num_threads(4)
+                with torch.no_grad():
+                    return self.model.encode(
+                        texts,
+                        batch_size=128,
+                        normalize_embeddings=True,
+                        convert_to_numpy=True,
+                    ).astype(np.float32)
+            except Exception:
+                return self.model.encode(
+                    texts,
+                    batch_size=128,
+                    normalize_embeddings=True,
+                    convert_to_numpy=True,
+                ).astype(np.float32)
 
         # Hash-based fallback (zero-dependency)
         matrix = np.zeros((len(texts), self.vector_dim), dtype=np.float32)
@@ -202,6 +217,7 @@ class DenseRetriever:
         query: str,
         top_k: int = 20,
         similarity_threshold: float = 0.0,
+        query_vector: Optional[np.ndarray] = None,
     ) -> Tuple[List[Dict[str, Any]], float]:
         """
         Search for top-k similar chunks.
@@ -215,7 +231,7 @@ class DenseRetriever:
         query_key = query.strip().lower()
 
         # LRU cache check
-        if query_key in self._query_cache:
+        if query_vector is None and query_key in self._query_cache:
             self._query_cache.move_to_end(query_key)
             cached = self._query_cache[query_key]
             elapsed = (time.perf_counter() - t0) * 1000
@@ -224,7 +240,10 @@ class DenseRetriever:
         results = []
 
         if self.embeddings_matrix is not None and len(self.embeddings_matrix) > 0:
-            q_vec = self._embed([query])[0]  # shape (dim,)
+            if query_vector is not None:
+                q_vec = query_vector
+            else:
+                q_vec = self._embed([query])[0]  # shape (dim,)
 
             if self.faiss_index is not None:
                 k = min(top_k, self.faiss_index.ntotal)

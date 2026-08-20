@@ -43,3 +43,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Scratch scripts
+scratch_*.py

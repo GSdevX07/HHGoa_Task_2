@@ -110,7 +110,7 @@ class GuardrailEngine:
 
     # ── Layer 1: Input Validation ─────────────────────────────────────────────
 
-    def validate_input(self, query: str) -> Dict[str, Any]:
+    def validate_input(self, query: str, query_vector: Optional[np.ndarray] = None) -> Dict[str, Any]:
         """
         Pre-execution guardrail: validate query safety and domain relevance.
 
@@ -140,7 +140,7 @@ class GuardrailEngine:
                 t0,
             )
 
-        # Prompt injection check
+        # Prompt injection check (< 0.05 ms)
         for pattern in self._injection_patterns:
             if pattern.search(query_clean):
                 return self._fail(
@@ -150,7 +150,7 @@ class GuardrailEngine:
                 )
 
         # Domain relevance check
-        relevance = self._check_domain_relevance(query_clean)
+        relevance = self._check_domain_relevance(query_clean, query_vector=query_vector)
         if not relevance["is_relevant"]:
             return self._fail(
                 "off_topic",
@@ -172,20 +172,34 @@ class GuardrailEngine:
             "domain_similarity": relevance["max_similarity"],
         }
 
-    def _check_domain_relevance(self, query: str) -> Dict[str, Any]:
+    def _check_domain_relevance(self, query: str, query_vector: Optional[np.ndarray] = None) -> Dict[str, Any]:
         """
         Check if the query is semantically related to the domain.
 
         Uses embedding cosine similarity against pre-embedded domain anchors.
         Falls back to keyword heuristics if no embedder is available.
         """
-        # Keyword-based fallback (when no embedder available)
+        # If query_vector is pre-computed and anchors are available, compute dot-product in < 0.01ms!
+        if query_vector is not None and self._anchor_embeddings is not None:
+            try:
+                norm = np.linalg.norm(query_vector)
+                q_emb = query_vector / norm if norm > 0 else query_vector
+                sims = np.dot(self._anchor_embeddings, q_emb)
+                max_sim = float(np.max(sims))
+                return {
+                    "is_relevant": max_sim >= _DOMAIN_THRESHOLD,
+                    "max_similarity": round(max_sim, 4),
+                    "method": "precomputed_embedding",
+                }
+            except Exception as exc:
+                logger.warning(f"GuardrailEngine: vector relevance check error — {exc}")
+
+        # Keyword-based fallback (when no embedder available or fast path)
         if self._embedder is None or self._anchor_embeddings is None:
             return self._keyword_relevance_check(query)
 
         try:
             q_emb = self._embedder([query])[0]  # shape (dim,)
-            # Cosine sim (anchors are already normalised, q_emb may need normalising)
             norm = np.linalg.norm(q_emb)
             if norm > 0:
                 q_emb = q_emb / norm

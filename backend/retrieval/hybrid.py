@@ -64,22 +64,21 @@ class HybridRetriever:
     def search(
         self,
         query: str,
-        top_k: int = 20,
+        top_k: int = 10,
+        query_vector: Optional[np.ndarray] = None,
     ) -> Tuple[List[Dict[str, Any]], Dict[str, float]]:
         """
-        Execute hybrid retrieval and return fused, ranked candidates.
+        Execute hybrid search: dense (FAISS) + sparse (BM25) with RRF fusion.
 
         Returns:
-            (results, stage_latencies_ms)
-            results: list of dicts with chunk_id, text, parent_text,
-                     metadata, dense_score, bm25_score, rrf_score, rank
-            stage_latencies_ms: {"dense_ms", "bm25_ms", "fusion_ms", "total_ms"}
+            (fused_results, latency_dict)
+            latency_dict keys: dense_ms, bm25_ms, fusion_ms, total_ms
         """
         t_total = time.perf_counter()
 
         # ── Dense retrieval ────────────────────────────────────────────────
         dense_results, dense_ms = self.dense.search(
-            query, top_k=self.candidate_pool
+            query, top_k=self.candidate_pool, query_vector=query_vector
         )
 
         # ── BM25 retrieval ─────────────────────────────────────────────────

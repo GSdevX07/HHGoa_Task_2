@@ -95,7 +95,7 @@ class STTEngine:
         }
         data = {
             "language_code": language_code,
-            "model": "saarika:v2"
+            "model": "saarika:v2.5"
         }
 
         try:
@@ -107,7 +107,7 @@ class STTEngine:
                     return {
                         "success": True,
                         "transcript": transcript,
-                        "provider": "Sarvam AI (saarika:v2)",
+                        "provider": "Sarvam AI (saarika:v2.5)",
                         "raw_response": result
                     }
                 else:

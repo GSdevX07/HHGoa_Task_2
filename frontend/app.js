@@ -548,10 +548,12 @@ document.addEventListener("DOMContentLoaded", () => {
           runs.forEach(r => {
             const row = document.createElement("tr");
             const isPassed = r.total_latency_ms <= 200.0;
+            const guardVal = typeof r.guardrail_ms === 'number' ? r.guardrail_ms : (r.cache_lookup_ms || 0.0);
             row.innerHTML = `
               <td>#${r.query_id}</td>
               <td>${r.query}</td>
               <td>${typeof r.stt_latency_ms === 'number' ? r.stt_latency_ms.toFixed(1) : '0.0'}</td>
+              <td>${guardVal.toFixed(1)}</td>
               <td>${typeof r.retrieval_latency_ms === 'number' ? r.retrieval_latency_ms.toFixed(1) : '0.0'}</td>
               <td>${typeof r.harness_latency_ms === 'number' ? r.harness_latency_ms.toFixed(1) : '0.0'}</td>
               <td style="font-weight: 700;">${r.total_latency_ms.toFixed(1)} ms</td>
@@ -573,33 +575,56 @@ document.addEventListener("DOMContentLoaded", () => {
   // ========================================================
   // 8. Tab 3: Vast Chunking Strategy Evaluator
   // ========================================================
+  async function loadChunkingTable() {
+    if (!chunkingComparisonTable) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/chunking/compare`, { method: "POST" });
+      const data = await res.json();
+      if (data && data.comparison) {
+        chunkingComparisonTable.innerHTML = "";
+        Object.values(data.comparison).forEach(c => {
+          const row = document.createElement("tr");
+          const stratName = (c.strategy || "UNKNOWN").replace("_", "-").toUpperCase();
+          row.innerHTML = `
+            <td><strong>${stratName}</strong></td>
+            <td>${c.total_chunks || 0}</td>
+            <td>${c.avg_chars_per_chunk || 0} chars (${c.avg_words_per_chunk || 0} words)</td>
+            <td>${c.min_words || 0} / ${c.max_words || 0} words</td>
+            <td>${(c.processing_ms || 0.5).toFixed(2)} ms</td>
+            <td><span class="badge-pass">EVALUATED</span></td>
+          `;
+          chunkingComparisonTable.appendChild(row);
+        });
+      }
+    } catch (e) {
+      console.error("Auto chunking table load error:", e);
+    }
+  }
+
+  // Load chunking table automatically on page load
+  loadChunkingTable();
+
+  // Reload chunking table when Tab 3 is selected
+  if (tabBtns[2]) {
+    tabBtns[2].addEventListener("click", () => {
+      loadChunkingTable();
+    });
+  }
+
   if (evalChunkingBtn) {
+    let isChunkingBusy = false;
     evalChunkingBtn.addEventListener("click", async () => {
+      if (isChunkingBusy) return;
+      isChunkingBusy = true;
       evalChunkingBtn.disabled = true;
       evalChunkingBtn.textContent = "⏳ Comparing...";
 
       try {
-        const res = await fetch(`${API_BASE}/api/chunking/compare`, { method: "POST" });
-        const data = await res.json();
-
-        if (chunkingComparisonTable && data.comparison) {
-          chunkingComparisonTable.innerHTML = "";
-          Object.values(data.comparison).forEach(c => {
-            const row = document.createElement("tr");
-            row.innerHTML = `
-              <td><strong>${c.strategy_name.toUpperCase()}</strong></td>
-              <td>${c.total_chunks}</td>
-              <td>${c.avg_chunk_length}</td>
-              <td>${c.min_chunk_length} / ${c.max_chunk_length}</td>
-              <td>${c.processing_time_ms} ms</td>
-              <td><span class="badge-pass">EVALUATED</span></td>
-            `;
-            chunkingComparisonTable.appendChild(row);
-          });
-        }
+        await loadChunkingTable();
       } catch (err) {
         console.error("Chunking eval error:", err);
       } finally {
+        isChunkingBusy = false;
         evalChunkingBtn.disabled = false;
         evalChunkingBtn.textContent = "🔄 Compare All Strategies";
       }
