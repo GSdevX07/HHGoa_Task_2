@@ -1,9 +1,6 @@
 """
-Hugging Face Spaces Entrypoint with ZeroGPU and Gradio Support
-=============================================================
-Provides both:
-1. Native Gradio UI with @spaces.GPU acceleration.
-2. Direct FastAPI mounting for the full Neo-Brutalist HTML/JS/CSS Web Console and REST APIs.
+Hugging Face Spaces Entrypoint with ZeroGPU and Gradio 6 Support
+===============================================================
 """
 
 import os
@@ -18,10 +15,8 @@ if _REPO_ROOT not in sys.path:
 # ZeroGPU decorator compatibility
 try:
     import spaces
-    gpu_decorator = spaces.GPU(duration=60)
-except Exception:
-    def gpu_decorator(f):
-        return f
+except ImportError:
+    spaces = None
 
 from backend.main import (
     app as fastapi_app,
@@ -33,9 +28,8 @@ from backend.main import (
 )
 
 
-@gpu_decorator
-def process_rag_query(audio_path, text_query, lang_code, provider, strategy):
-    """ZeroGPU-compatible handler for Voice & Text queries."""
+def _core_rag_logic(audio_path, text_query, lang_code, provider, strategy):
+    """Core RAG logic callable within GPU or CPU context."""
     async def _async_run():
         transcript = ""
         stt_latency = 0.0
@@ -63,13 +57,13 @@ def process_rag_query(audio_path, text_query, lang_code, provider, strategy):
                     f"⚠️ STT Transcription Error: {stt_res.get('error', 'Unknown')}\n\nTip: Add SARVAM_API_KEY in Space Settings.",
                     "0.0",
                     "N/A",
-                    "{}",
+                    "",
                 )
         elif text_query and text_query.strip():
             transcript = text_query.strip()
             provider_used = "text_input"
         else:
-            return "Please provide an audio recording or type a text query.", "0.0", "N/A", "{}"
+            return "Please provide an audio recording or type a text query.", "0.0", "N/A", ""
 
         # Execute full RAG pipeline
         rag_res = await _execute_rag_pipeline(
@@ -85,7 +79,7 @@ def process_rag_query(audio_path, text_query, lang_code, provider, strategy):
         answer = res_dict.get("answer", "")
         groundedness = f"{res_dict.get('groundedness_score', 0.0):.2f}"
         language = res_dict.get("detected_language", lang_code)
-        
+
         # Citations formatting
         cits = res_dict.get("citations", [])
         cit_text = ""
@@ -106,6 +100,16 @@ def process_rag_query(audio_path, text_query, lang_code, provider, strategy):
     return asyncio.run(_async_run())
 
 
+# Decorate with spaces.GPU if ZeroGPU is active
+if spaces is not None:
+    @spaces.GPU(duration=60)
+    def process_rag_query(audio_path, text_query, lang_code, provider, strategy):
+        return _core_rag_logic(audio_path, text_query, lang_code, provider, strategy)
+else:
+    def process_rag_query(audio_path, text_query, lang_code, provider, strategy):
+        return _core_rag_logic(audio_path, text_query, lang_code, provider, strategy)
+
+
 # ── Gradio UI Construction ───────────────────────────────────────────────────
 
 custom_css = """
@@ -114,7 +118,7 @@ custom_css = """
 .main-header h1 { font-size: 2.2rem; font-weight: 800; color: #1e1e2f; }
 """
 
-with gr.Blocks(title="🎙️ Voice RAG — MSMARCO-XI", css=custom_css, theme=gr.themes.Soft()) as demo:
+with gr.Blocks(title="🎙️ Voice RAG — MSMARCO-XI") as demo:
     gr.Markdown(
         """
         # 🎙️ Multilingual Voice-Enabled RAG System
@@ -180,7 +184,7 @@ with gr.Blocks(title="🎙️ Voice RAG — MSMARCO-XI", css=custom_css, theme=g
 
         with gr.TabItem("🧩 System Diagnostics & Info"):
             gr.Markdown(
-                f"""
+                """
                 ### 📊 System Status
                 - **Dataset**: AI4Bharat MSMARCO-XI (Multilingual)
                 - **Dense Retrieval**: `all-MiniLM-L6-v2` (384-dim FAISS)
@@ -191,8 +195,11 @@ with gr.Blocks(title="🎙️ Voice RAG — MSMARCO-XI", css=custom_css, theme=g
                 """
             )
 
-# Mount Gradio and FastAPI together
-app = gr.mount_gradio_app(fastapi_app, demo, path="/")
 
-if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=int(os.environ.get("PORT", 7860)))
+# Always launch Gradio demo directly for Hugging Face Spaces & ZeroGPU
+demo.launch(
+    server_name="0.0.0.0",
+    server_port=int(os.environ.get("PORT", 7860)),
+    css=custom_css,
+    theme=gr.themes.Soft(),
+)
