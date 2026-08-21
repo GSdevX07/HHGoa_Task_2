@@ -793,11 +793,3 @@ async def get_retrieval_info():
 _FRONTEND_DIR = os.path.join(_REPO_ROOT, "frontend")
 if os.path.exists(_FRONTEND_DIR):
     app.mount("/", StaticFiles(directory=_FRONTEND_DIR, html=True), name="frontend")
-
-
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", 8000))
-    host = os.environ.get("HOST", "0.0.0.0")
-    uvicorn.run("backend.main:app" if os.path.exists("backend") else "main:app", host=host, port=port, reload=False)
-
