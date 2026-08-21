@@ -1,8 +1,8 @@
 ﻿# 🎙️ Multilingual Voice RAG System
-### HackHazards Goa 2026 — Task 2
+### HackHouse Goa 2026 — Task 2
 
 > **Real-time, multilingual voice query answering over the AI4Bharat MSMARCO-XI corpus.**
-> Supports **English, Hindi & Marathi** — voice in, grounded answer out — in under **50ms** end-to-end (excluding STT).
+> Supports **English, Hindi & Marathi** — voice in, grounded answer out — in under **40ms** end-to-end (excluding STT).
 
 ---
 
@@ -326,4 +326,4 @@ No GPU required. Runs entirely on CPU.
 
 ---
 
-*Built for HackHazards Goa 2026 — Task 2: Multilingual Voice RAG*
+*Built for HackHouse Goa 2026 — Task 2: Multilingual Voice RAG*
