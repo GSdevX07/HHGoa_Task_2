@@ -19,6 +19,9 @@ SENTENCE_SPLIT_REGEX = re.compile(r"[\n\r]+|(?<=[.!?।॥])\s+")
 STOPWORDS = {
     "what", "is", "the", "of", "and", "a", "to", "in", "for", "are", "on", "with",
     "as", "by", "at", "from", "how", "where", "who", "which", "why", "when", "does", "do",
+    "i", "me", "my", "you", "your", "we", "us", "can", "could", "would", "should", "please",
+    "tell", "show", "give", "find", "get", "want", "need", "know", "explain", "detail", "details",
+    "batao", "bataiye", "saanga", "sang",
     "का", "के", "की", "है", "हैं", "में", "से", "को", "पर", "यह", "और", "एक", "क्या",
     "ఉంది", "యొక్క", "మరియు", "అనేది", "ஆகும்", "மற்றும்", "என்பது"
 }
@@ -54,11 +57,11 @@ def extract_query_keywords(query: str) -> Tuple[set, set, List[str]]:
     phrases = []
     for i in range(len(tokens) - 1):
         w1, w2 = tokens[i], tokens[i+1]
-        if w1 not in STOPWORDS and w2 not in STOPWORDS:
+        if w1 in subject_keywords and w2 in subject_keywords:
             phrases.append(f"{w1} {w2}")
         if i < len(tokens) - 2:
             w3 = tokens[i+2]
-            if w1 not in STOPWORDS and w3 not in STOPWORDS:
+            if w1 in subject_keywords and w2 in subject_keywords and w3 in subject_keywords:
                 phrases.append(f"{w1} {w2} {w3}")
 
     return all_keywords, subject_keywords, phrases
