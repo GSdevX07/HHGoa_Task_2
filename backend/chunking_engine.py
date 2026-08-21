@@ -87,9 +87,12 @@ class ChunkingEngine:
 
         for doc in documents:
             doc_id = doc.get("id") or doc.get("passage_id") or doc.get("doc_id") or "doc_unknown"
-            # Support both 'text' (official dataset) and 'passage' / 'passage_en' (legacy/built-in)
-            text = doc.get("text", "") or doc.get("passage", "") or doc.get("passage_en", "")
-            text = text.strip()
+            p_native = (doc.get("passage", "") or doc.get("text", "")).strip()
+            p_en = doc.get("passage_en", "").strip()
+            if p_native and p_en and p_en != p_native:
+                text = f"{p_native}\n\n{p_en}"
+            else:
+                text = p_native or p_en
 
             if not text:
                 continue

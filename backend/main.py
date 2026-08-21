@@ -63,7 +63,7 @@ logger = logging.getLogger("rag_api")
 _INDEX_DIR = os.path.join(_REPO_ROOT, "indexes")
 _RERANKER_TOP_K = int(os.getenv("RERANKER_TOP_K", "3"))
 _RETRIEVAL_CANDIDATE_POOL = int(os.getenv("RETRIEVAL_CANDIDATE_POOL", "20"))
-_RETRIEVAL_THRESHOLD = float(os.getenv("RETRIEVAL_THRESHOLD", "0.30"))
+_RETRIEVAL_THRESHOLD = float(os.getenv("RETRIEVAL_THRESHOLD", "0.20"))
 
 # ── Global Singletons ─────────────────────────────────────────────────────────
 
@@ -152,30 +152,38 @@ async def lifespan(app: FastAPI):
     # ── Step 4: Pre-warm Caches with Corpus Query-Answer Pairs ──────────────
     prewarm_count = 0
     for doc in current_corpus:
-        q_en = doc.get("query_en") or doc.get("query", "")
-        q_orig = doc.get("query", "")
+        q_en = doc.get("query_en", "").strip()
+        q_orig = doc.get("query", "").strip()
         ans_list = doc.get("answers", [])
         passage = doc.get("passage", "")
+        passage_en = doc.get("passage_en", "")
         
-        answer_text = ans_list[0] if ans_list else passage[:250]
-        if q_en and answer_text:
-            exact_cache.put(q_en, answer_text, citations=[{
+        native_answer = ans_list[0] if ans_list else (passage[:250] if passage else "")
+        en_answer = passage_en if passage_en else native_answer
+        
+        if q_en and en_answer:
+            citation_en = [{
                 "chunk_id": f"{doc.get('id', 'doc')}_0000",
                 "similarity_score": 1.0,
                 "reranker_score": 1.0,
-                "snippet": passage[:200] + ("..." if len(passage) > 200 else ""),
-                "language": doc.get("lang_name", "English")
-            }], lang_code="en")
-            prewarm_count += 1
-        if q_orig and q_orig != q_en and answer_text:
-            exact_cache.put(q_orig, answer_text, citations=[{
+                "snippet": (passage_en[:200] if passage_en else passage[:200]),
+                "language": "English"
+            }]
+            exact_cache.put(q_en, en_answer, citations=citation_en, lang_code="en")
+            exact_cache.put(q_en, en_answer, citations=citation_en, lang_code="")
+            prewarm_count += 2
+            
+        if q_orig and q_orig != q_en and native_answer:
+            citation_native = [{
                 "chunk_id": f"{doc.get('id', 'doc')}_0000",
                 "similarity_score": 1.0,
                 "reranker_score": 1.0,
-                "snippet": passage[:200] + ("..." if len(passage) > 200 else ""),
+                "snippet": passage[:200],
                 "language": doc.get("lang_name", "Hindi")
-            }], lang_code=doc.get("language", "hi"))
-            prewarm_count += 1
+            }]
+            exact_cache.put(q_orig, native_answer, citations=citation_native, lang_code=doc.get("language", "hi"))
+            exact_cache.put(q_orig, native_answer, citations=citation_native, lang_code="")
+            prewarm_count += 2
 
     logger.info(f"ExactCache pre-warmed with {prewarm_count} authoritative query-answer entries.")
 
@@ -449,10 +457,11 @@ async def _execute_rag_pipeline(
     enable_guardrails: bool,
     synthesis_mode: str = "extractive",
     _notify_searching_done=None,
+    bypass_cache: bool = False,
 ) -> RAGResponse:
     """
     Full orchestration with ultra-low latency caching and extractive synthesis:
-      1. ExactCache lookup (<0.1ms fast-path)
+      1. ExactCache lookup (<0.1ms fast-path)  [skipped if bypass_cache=True]
       2. Input guardrail (<1ms)
       3. Hybrid retrieval (Dense + BM25 + RRF fusion) (<3ms)
       4. Cross-encoder reranking (optional)
@@ -465,7 +474,9 @@ async def _execute_rag_pipeline(
     tracker = LatencyTracker()
 
     # ── 0. Exact Cache Fast-Path (<0.1ms) ─────────────────────────────────────
-    cached_entry = exact_cache.get(transcript, language_code)
+    # bypass_cache=True is used by the benchmark route so it always measures
+    # the real full pipeline latency, not a dictionary lookup.
+    cached_entry = None if bypass_cache else exact_cache.get(transcript, language_code)
     if cached_entry:
         wall_total_ms = round((time.perf_counter() - wall_clock_start) * 1000, 3)
         cached_citations = [
@@ -550,9 +561,8 @@ async def _execute_rag_pipeline(
     # Use reranked if available, else top-3 from hybrid
     final_results = reranked_results if reranked_results else candidates[:_RERANKER_TOP_K]
     top_score = (
-        final_results[0].get("reranker_score",
-        final_results[0].get("rrf_score",
-        final_results[0].get("dense_score", 0.0)))
+        final_results[0].get("dense_score",
+        final_results[0].get("reranker_score", 0.0))
         if final_results else 0.0
     )
 
@@ -729,7 +739,7 @@ async def run_latency_benchmark(req: BenchmarkRequest):
 
     runs = []
 
-    # Warmup — not counted in results
+    # Warmup — not counted in results (bypass cache so warmup is also real)
     if query_items:
         await _execute_rag_pipeline(
             transcript=query_items[0]["query"],
@@ -739,6 +749,7 @@ async def run_latency_benchmark(req: BenchmarkRequest):
             language_code=query_items[0]["lang_code"],
             enable_guardrails=True,
             synthesis_mode=synthesis_mode,
+            bypass_cache=True,
         )
 
     for idx, item in enumerate(query_items, 1):
@@ -753,6 +764,7 @@ async def run_latency_benchmark(req: BenchmarkRequest):
             language_code=l_code,
             enable_guardrails=True,
             synthesis_mode=synthesis_mode,
+            bypass_cache=True,   # always measure real pipeline, not cache lookup
         )
         wall_ms = round((time.perf_counter() - t0) * 1000, 2)
 

@@ -94,7 +94,7 @@ class SemanticCache:
     In-memory semantic vector cache using cosine similarity.
     Target latency: < 0.8ms
     """
-    def __init__(self, threshold: float = 0.93, max_size: int = 2000):
+    def __init__(self, threshold: float = 0.98, max_size: int = 2000):
         self.threshold = threshold
         self.max_size = max_size
         self._embeddings: List[np.ndarray] = []

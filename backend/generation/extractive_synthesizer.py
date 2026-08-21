@@ -28,7 +28,8 @@ STOPWORDS = {
 
 GENERIC_QUESTION_WORDS = {
     "capital", "city", "country", "state", "name", "definition", "meaning", "meaning of",
-    "list", "tell", "explain", "about", "called", "known", "as"
+    "list", "tell", "explain", "about", "called", "known", "as", "serves", "serve",
+    "located", "situated", "acts", "act", "means", "stands", "defined", "named"
 }
 
 
@@ -90,6 +91,24 @@ class ExtractiveSynthesizer:
 
         all_keywords, subject_keywords, query_phrases = extract_query_keywords(query)
 
+        # ── Subject entity presence guard ──────────────────────────────────────
+        # If the query has named subject keywords (e.g. "telangana", "pakistan"),
+        # verify at least one appears in ANY of the top-3 retrieved passages.
+        # If none match → corpus doesn't know about this entity → return ""
+        # which causes is_refusal=True ("data not available").
+        if subject_keywords:
+            subject_found_in_corpus = any(
+                any(kw in (r.get("parent_text") or r.get("text", "")).lower()
+                    for kw in subject_keywords)
+                for r in retrieved_results[:3]
+            )
+            if not subject_found_in_corpus:
+                logger.debug(
+                    "Synthesizer: subject %s absent from all retrieved passages → refusal",
+                    subject_keywords,
+                )
+                return "", round((time.perf_counter() - t0) * 1000, 3)
+
         # Collect all candidate sentences from top passages
         scored_sentences = []
         seen_sentences = set()
@@ -110,11 +129,12 @@ class ExtractiveSynthesizer:
                 # Check multi-word phrase matching
                 phrase_match = any(p in norm_s for p in query_phrases) if query_phrases else False
                 
-                # If query contains multi-word entity phrases (e.g. "south africa"),
-                # enforce that sentence must match the phrase or all component words.
-                if query_phrases and not phrase_match:
+                # Only enforce strict phrase matching for longer entity phrases (3+ words like "new delhi")
+                # For general queries, allow any sentence with subject keyword hits
+                long_phrases = [p for p in query_phrases if len(p.split()) >= 3]
+                if long_phrases and not phrase_match:
                     all_phrase_words_in_sentence = False
-                    for p in query_phrases:
+                    for p in long_phrases:
                         p_words = set(p.split())
                         if p_words.issubset(s_tokens):
                             all_phrase_words_in_sentence = True
@@ -122,14 +142,25 @@ class ExtractiveSynthesizer:
                     if not all_phrase_words_in_sentence:
                         continue
 
+                def matches_token(kw: str, st: str) -> bool:
+                    if len(st) < 3 or len(kw) < 3:
+                        return kw == st
+                    if kw in st:
+                        return True
+                    if len(kw) >= 4 and len(st) >= 4 and kw[:4] == st[:4]:
+                        return True
+                    return False
+
                 # Subject keyword match check
-                subject_matches = sum(1 for kw in subject_keywords if kw in s_tokens or any(kw in st for st in s_tokens))
+                subject_matches = sum(1 for kw in subject_keywords if any(matches_token(kw, st) for st in s_tokens))
                 
                 # General keyword overlap score
-                overlap_count = sum(1 for kw in all_keywords if kw in s_tokens or any(kw in st for st in s_tokens))
+                overlap_count = sum(1 for kw in all_keywords if any(matches_token(kw, st) for st in s_tokens))
                 overlap_ratio = overlap_count / max(len(all_keywords), 1)
 
-                # If query has subject keywords (e.g. "South Africa"), reject 0 subject matches
+                # Require at least one subject keyword to match the sentence.
+                # No score-based exception: the corpus-level check above already
+                # confirmed the subject exists somewhere — so per-sentence matching must hold.
                 if subject_keywords and subject_matches == 0:
                     continue
 
@@ -157,7 +188,12 @@ class ExtractiveSynthesizer:
                     "sentence_idx": s_idx,
                 })
 
-        if not scored_sentences:
+        if not scored_sentences and retrieved_results:
+            # Fallback: extract first sentence from the top retrieved passage
+            top_passage_text = retrieved_results[0].get("parent_text") or retrieved_results[0].get("text", "")
+            fallback_sents = split_into_sentences(top_passage_text)
+            if fallback_sents:
+                return fallback_sents[0], round((time.perf_counter() - t0) * 1000, 3)
             return "", round((time.perf_counter() - t0) * 1000, 3)
 
         # Sort by total score descending

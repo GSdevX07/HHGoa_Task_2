@@ -246,13 +246,15 @@ class ModelHarness:
             model_used = "extractive_synthesizer"
             attempt_count = 1
             llm_ms = round((time.perf_counter() - synth_start) * 1000, 3)
-            # Extracted answers from verified passages are inherently 100% grounded
+            # Groundedness is 100% only when a real sentence was extracted from a passage.
+            # If synthesizer returned "" (subject not in corpus), mark as not grounded.
+            _has_real_answer = bool(answer and len(answer.strip()) >= 5)
             groundedness_result = {
-                "groundedness_score": 1.0,
-                "is_grounded": True,
-                "grounded_claims": 1,
+                "groundedness_score": 1.0 if _has_real_answer else 0.0,
+                "is_grounded": _has_real_answer,
+                "grounded_claims": 1 if _has_real_answer else 0,
                 "total_claims": 1,
-                "flagged": False,
+                "flagged": not _has_real_answer,
                 "latency_ms": 0.01,
             }
         else:

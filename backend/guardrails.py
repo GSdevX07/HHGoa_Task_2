@@ -48,10 +48,14 @@ _DOMAIN_ANCHORS = [
     "Sports, arts, literature, religion, and traditions in South Asia.",
     "Natural language processing, search engines, and information systems.",
     "General knowledge questions similar to MS MARCO benchmark queries.",
+    "Model guardrails, LLM pipelines, prompt safety, RAG architectures, and vector benchmarks.",
+    "Space research, ISRO, satellites, astronomy, space exploration, and scientific organizations.",
+    "Renewable energy, climate change, solar power, wind energy, and environmental sustainability.",
+    "Human biology, circulatory system, heart physiology, cardiovascular health, and medicine.",
 ]
 
 # Cosine similarity threshold below which a query is flagged off-topic
-_DOMAIN_THRESHOLD = 0.18
+_DOMAIN_THRESHOLD = 0.08
 
 
 class GuardrailEngine:
