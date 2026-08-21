@@ -2,7 +2,7 @@
 ### HackHouse Goa 2026 — Task 2
 
 > **Real-time, multilingual voice query answering over the AI4Bharat MSMARCO-XI corpus.**
-> Supports **English, Hindi & Marathi** — voice in, grounded answer out — in under **40ms** end-to-end (excluding STT).
+> Supports **English, Hindi & Marathi** - voice in, grounded answer out — in under **40ms** end-to-end (excluding STT).
 
 ---
 
@@ -21,14 +21,14 @@
 
 ## What This Does
 
-This system accepts a **voice query** (or text query) in English, Hindi, or Marathi and returns a factually grounded answer extracted directly from the MSMARCO-XI multilingual corpus — no hallucination, no LLM guessing.
+This system accepts a **voice query** (or text query) in English, Hindi, or Marathi and returns a factually grounded answer extracted directly from the MSMARCO-XI multilingual corpus no hallucination, no LLM guessing.
 
 **Key capabilities:**
 - 🎤 **Voice → Text → Answer** via Sarvam AI / ElevenLabs STT
 - 🌐 **Trilingual**: English, Hindi (`hi-IN`), Marathi (`mr-IN`)
 - ⚡ **Sub-50ms** RAG pipeline (embedding + retrieval + synthesis)
 - 🛡️ **Guardrails**: domain check → retrieval confidence → groundedness verification
-- 🚫 **Honest refusals**: if the answer is not in the corpus, says so — never hallucinates
+- 🚫 **Honest refusals**: if the answer is not in the corpus, says so never hallucinates
 - 📊 **Live benchmark**: latency percentiles (P50/P70/P100) via `/api/benchmark/run`
 
 ---
@@ -48,14 +48,14 @@ Voice / Text Query
 ┌───────────────────────────────────────────────────────┐
 │                   RAG Pipeline                        │
 │                                                       │
-│  1. ExactCache     ── pre-warmed, <0.1ms hit         │
-│  2. Guardrail L1   ── domain anchor check            │
-│  3. Embed Query    ── all-MiniLM-L6-v2, ~15ms        │
+│  1. ExactCache     pre-warmed, <0.1ms hit         │
+│  2. Guardrail L1   domain anchor check            │
+│  3. Embed Query    ll-MiniLM-L6-v2, ~15ms        │
 │  4. Hybrid Retrieval                                  │
 │     ├── Dense FAISS  (~0.6ms)                         │
 │     ├── BM25         (~7ms)                           │
 │     └── RRF Fusion   (~0.1ms)                         │
-│  5. Guardrail L2   ── retrieval confidence >= 0.20    │
+│  5. Guardrail L2   retrieval confidence >= 0.20    │
 │  6. Extractive Synthesizer                            │
 │     ├── Subject entity presence check                 │
 │     ├── Sentence scoring (keyword + position)         │
@@ -68,7 +68,7 @@ Voice / Text Query
           JSON Response
 ```
 
-**Corpus**: AI4Bharat MSMARCO-XI — 3,042 documents, 3,057 bilingual semantic chunks
+**Corpus**: AI4Bharat MSMARCO-XI-3,042 documents, 3,057 bilingual semantic chunks
 **Chunking**: Semantic (256-token target, sentence-boundary-aware)
 **Index**: FAISS flat L2 + BM25, pre-built and committed to repo for zero-setup deployment
 
@@ -103,11 +103,11 @@ python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 
 ### 4. Open the Frontend
 
-Open `frontend/index.html` directly in your browser — no build step needed.
+Open `frontend/index.html` directly in your browser no build step needed.
 
 ---
 
-## API Keys — Where to Get Them
+## API Keys - Where to Get Them
 
 ### Required for Voice Queries
 
@@ -211,7 +211,7 @@ All 42 corpus queries across English, Hindi, and Marathi answer correctly.
 
 ### Refusal Accuracy — Out-of-Corpus Queries
 
-Queries about entities **not present** in MSMARCO-XI are correctly refused — the system never fabricates an answer.
+Queries about entities **not present** in MSMARCO-XI are correctly refused the system never fabricates an answer.
 
 | Query | Expected | Result |
 |-------|----------|--------|
@@ -226,7 +226,7 @@ Queries about entities **not present** in MSMARCO-XI are correctly refused — t
 
 ### Why Extractive (not Generative)?
 
-Extractive synthesis pulls the best-matching sentence **directly from the retrieved passage** — it cannot hallucinate because the answer is always a verbatim quote from the corpus. Generative LLMs can confidently produce wrong answers; extractive synthesis cannot. Groundedness is 100% verifiable.
+Extractive synthesis pulls the best-matching sentence **directly from the retrieved passage** it cannot hallucinate because the answer is always a verbatim quote from the corpus. Generative LLMs can confidently produce wrong answers; extractive synthesis cannot. Groundedness is 100% verifiable.
 
 ### Three-Layer Guardrail System
 
@@ -242,8 +242,8 @@ Before scoring any sentence, the synthesizer checks whether the query's primary 
 
 ### Hybrid Retrieval (Dense + BM25 + RRF)
 
-- **Dense FAISS**: semantic similarity via MiniLM — catches paraphrase queries
-- **BM25**: exact keyword match — catches proper nouns, codes, names
+- **Dense FAISS**: semantic similarity via MiniLM catches paraphrase queries
+- **BM25**: exact keyword match catches proper nouns, codes, names
 - **RRF fusion**: combines both rankings without weight tuning
 
 ### ExactCache + SemanticCache
@@ -274,7 +274,7 @@ HHGoa_Task_2/
 │   │   ├── bm25_retriever.py            # BM25
 │   │   └── hybrid_retriever.py          # RRF fusion
 │   ├── requirements.txt
-│   └── .env.example                 # Template — copy to .env and fill keys
+│   └── .env.example                 # Template - copy to .env and fill keys
 ├── frontend/
 │   ├── index.html                   # Main UI (no build step needed)
 │   ├── app.js                       # Voice recording + SSE streaming
