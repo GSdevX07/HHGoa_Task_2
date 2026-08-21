@@ -1,12 +1,12 @@
-﻿# 🎙️ Multilingual Voice RAG System
-### HackHouse Goa 2026 — Task 2
+﻿# Multilingual Voice RAG System
+### HackerHouse Goa 2026 - Task 2
 
 > **Real-time, multilingual voice query answering over the AI4Bharat MSMARCO-XI corpus.**
-> Supports **English, Hindi & Marathi** - voice in, grounded answer out — in under **40ms** end-to-end (excluding STT).
+> Supports **English, Hindi & Marathi** - voice in, grounded answer out in under **40ms** end-to-end (excluding STT).
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 - [What This Does](#what-this-does)
 - [Architecture](#architecture)
 - [Quick Start](#quick-start)
@@ -24,12 +24,12 @@
 This system accepts a **voice query** (or text query) in English, Hindi, or Marathi and returns a factually grounded answer extracted directly from the MSMARCO-XI multilingual corpus no hallucination, no LLM guessing.
 
 **Key capabilities:**
-- 🎤 **Voice → Text → Answer** via Sarvam AI / ElevenLabs STT
-- 🌐 **Trilingual**: English, Hindi (`hi-IN`), Marathi (`mr-IN`)
-- ⚡ **Sub-50ms** RAG pipeline (embedding + retrieval + synthesis)
-- 🛡️ **Guardrails**: domain check → retrieval confidence → groundedness verification
-- 🚫 **Honest refusals**: if the answer is not in the corpus, says so never hallucinates
-- 📊 **Live benchmark**: latency percentiles (P50/P70/P100) via `/api/benchmark/run`
+-  **Voice → Text → Answer** via Sarvam AI / ElevenLabs STT
+-  **Trilingual**: English, Hindi (`hi-IN`), Marathi (`mr-IN`)
+-  **Sub-50ms** RAG pipeline (embedding + retrieval + synthesis)
+-  **Guardrails**: domain check → retrieval confidence → groundedness verification
+-  **Honest refusals**: if the answer is not in the corpus, says so never hallucinates
+-  **Live benchmark**: latency percentiles (P50/P70/P100) via `/api/benchmark/run`
 
 ---
 
@@ -48,14 +48,14 @@ Voice / Text Query
 ┌───────────────────────────────────────────────────────┐
 │                   RAG Pipeline                        │
 │                                                       │
-│  1. ExactCache     pre-warmed, <0.1ms hit         │
-│  2. Guardrail L1   domain anchor check            │
-│  3. Embed Query    ll-MiniLM-L6-v2, ~15ms        │
+│  1. ExactCache     pre-warmed, <0.1ms hit             │
+│  2. Guardrail L1   domain anchor check                │
+│  3. Embed Query    ll-MiniLM-L6-v2, ~15ms             │
 │  4. Hybrid Retrieval                                  │
 │     ├── Dense FAISS  (~0.6ms)                         │
 │     ├── BM25         (~7ms)                           │
 │     └── RRF Fusion   (~0.1ms)                         │
-│  5. Guardrail L2   retrieval confidence >= 0.20    │
+│  5. Guardrail L2   retrieval confidence >= 0.20       │
 │  6. Extractive Synthesizer                            │
 │     ├── Subject entity presence check                 │
 │     ├── Sentence scoring (keyword + position)         │
@@ -118,7 +118,7 @@ Open `frontend/index.html` directly in your browser no build step needed.
 
 > **Text queries** (`/api/query/text`) work **without any STT key** — you can test the full RAG pipeline without voice.
 
-### Optional — LLM Generation
+### Optional - LLM Generation
 
 | Key | Provider | Where to Get | Free Tier |
 |-----|----------|-------------|-----------|
@@ -127,7 +127,7 @@ Open `frontend/index.html` directly in your browser no build step needed.
 
 > The system runs in **extractive mode by default** (no LLM needed).
 
-### Optional — Dataset Download Only
+### Optional - Dataset Download Only
 
 | Key | Provider | Where to Get | Notes |
 |-----|----------|-------------|-------|
@@ -172,7 +172,7 @@ All results measured on **Windows 11, CPU-only, all-MiniLM-L6-v2**, no GPU.
 STT latency excluded (measured separately via voice endpoint).
 Cache bypassed so every run reflects the **real full pipeline cost**.
 
-### End-to-End RAG Pipeline — 100 Queries, MSMARCO-XI
+### End-to-End RAG Pipeline - 100 Queries, MSMARCO-XI
 
 | Metric | Value |
 |--------|-------|
@@ -326,4 +326,4 @@ No GPU required. Runs entirely on CPU.
 
 ---
 
-*Built for HackHouse Goa 2026 — Task 2: Multilingual Voice RAG*
+*Built for HackerHouse Goa 2026 - Task 2: Multilingual Voice RAG*
