@@ -80,6 +80,10 @@ class ExactCache:
         }
         self._access_order.append(norm_key)
 
+    def clear(self):
+        self._cache.clear()
+        self._access_order.clear()
+
     @property
     def size(self) -> int:
         return len(self._cache)
@@ -134,6 +138,10 @@ class SemanticCache:
             "groundedness_score": groundedness_score,
             "timestamp": time.time(),
         })
+
+    def clear(self):
+        self._embeddings.clear()
+        self._entries.clear()
 
     @property
     def size(self) -> int:

@@ -18,9 +18,14 @@ SENTENCE_SPLIT_REGEX = re.compile(r"[\n\r]+|(?<=[.!?।॥])\s+")
 
 STOPWORDS = {
     "what", "is", "the", "of", "and", "a", "to", "in", "for", "are", "on", "with",
-    "as", "by", "at", "from", "how", "where", "who", "which", "why", "when",
+    "as", "by", "at", "from", "how", "where", "who", "which", "why", "when", "does", "do",
     "का", "के", "की", "है", "हैं", "में", "से", "को", "पर", "यह", "और", "एक", "क्या",
     "ఉంది", "యొక్క", "మరియు", "అనేది", "ஆகும்", "மற்றும்", "என்பது"
+}
+
+GENERIC_QUESTION_WORDS = {
+    "capital", "city", "country", "state", "name", "definition", "meaning", "meaning of",
+    "list", "tell", "explain", "about", "called", "known", "as"
 }
 
 
@@ -37,11 +42,26 @@ def split_into_sentences(text: str) -> List[str]:
     return sentences if sentences else [text.strip()]
 
 
-def extract_query_keywords(query: str) -> set:
-    """Extract content words from query for lexical matching."""
+def extract_query_keywords(query: str) -> Tuple[set, set, List[str]]:
+    """Extract content words, subject keywords, and multi-word phrases from query."""
     cleaned = unicodedata.normalize("NFKC", query).lower()
     tokens = re.findall(r"[\w\u0900-\u0D7F]+", cleaned)
-    return {t for t in tokens if t not in STOPWORDS and len(t) > 1}
+    
+    all_keywords = {t for t in tokens if t not in STOPWORDS and len(t) > 1}
+    subject_keywords = {t for t in all_keywords if t not in GENERIC_QUESTION_WORDS}
+
+    # Extract 2-word & 3-word subject phrases (e.g. "south africa", "new delhi")
+    phrases = []
+    for i in range(len(tokens) - 1):
+        w1, w2 = tokens[i], tokens[i+1]
+        if w1 not in STOPWORDS and w2 not in STOPWORDS:
+            phrases.append(f"{w1} {w2}")
+        if i < len(tokens) - 2:
+            w3 = tokens[i+2]
+            if w1 not in STOPWORDS and w3 not in STOPWORDS:
+                phrases.append(f"{w1} {w2} {w3}")
+
+    return all_keywords, subject_keywords, phrases
 
 
 class ExtractiveSynthesizer:
@@ -57,16 +77,17 @@ class ExtractiveSynthesizer:
         max_sentences: int = 2,
     ) -> Tuple[str, float]:
         """
-        Synthesize answer from retrieved passages.
+        Synthesize answer from retrieved passages with strict subject/phrase matching
+        and single-passage sentence coherence.
         Returns (answer_string, latency_ms).
         """
         t0 = time.perf_counter()
         if not retrieved_results:
             return "", round((time.perf_counter() - t0) * 1000, 3)
 
-        query_keywords = extract_query_keywords(query)
+        all_keywords, subject_keywords, query_phrases = extract_query_keywords(query)
 
-        # Collect all candidate sentences from the top passages
+        # Collect all candidate sentences from top passages
         scored_sentences = []
         seen_sentences = set()
 
@@ -82,24 +103,53 @@ class ExtractiveSynthesizer:
                 seen_sentences.add(norm_s)
 
                 s_tokens = set(re.findall(r"[\w\u0900-\u0D7F]+", norm_s))
-                
-                # 1. Keyword overlap score
-                overlap_count = sum(1 for kw in query_keywords if kw in s_tokens or any(kw in st for st in s_tokens))
-                overlap_ratio = overlap_count / max(len(query_keywords), 1)
 
-                # 2. Position bias (first sentence in passage often contains main definition)
+                # Check multi-word phrase matching
+                phrase_match = any(p in norm_s for p in query_phrases) if query_phrases else False
+                
+                # If query contains multi-word entity phrases (e.g. "south africa"),
+                # enforce that sentence must match the phrase or all component words.
+                if query_phrases and not phrase_match:
+                    all_phrase_words_in_sentence = False
+                    for p in query_phrases:
+                        p_words = set(p.split())
+                        if p_words.issubset(s_tokens):
+                            all_phrase_words_in_sentence = True
+                            break
+                    if not all_phrase_words_in_sentence:
+                        continue
+
+                # Subject keyword match check
+                subject_matches = sum(1 for kw in subject_keywords if kw in s_tokens or any(kw in st for st in s_tokens))
+                
+                # General keyword overlap score
+                overlap_count = sum(1 for kw in all_keywords if kw in s_tokens or any(kw in st for st in s_tokens))
+                overlap_ratio = overlap_count / max(len(all_keywords), 1)
+
+                # If query has subject keywords (e.g. "South Africa"), reject 0 subject matches
+                if subject_keywords and subject_matches == 0:
+                    continue
+
+                # Position bias (first sentence in passage often contains main definition)
                 position_bonus = 0.35 if s_idx == 0 else (0.15 if s_idx == 1 else 0.0)
 
-                # 3. Passage rank weighting
+                # Passage rank weighting
                 rank_weight = 1.0 / (1.0 + 0.5 * passage_rank)
 
-                # 4. Total relevance score
-                total_score = (overlap_ratio * 2.0 + position_bonus + base_score * 0.5) * rank_weight
+                # Total relevance score
+                total_score = (
+                    overlap_ratio * 2.0 + 
+                    (2.0 if phrase_match else 0.0) +
+                    subject_matches * 1.5 + 
+                    position_bonus + 
+                    base_score * 0.5
+                ) * rank_weight
 
                 scored_sentences.append({
                     "text": sentence,
                     "score": total_score,
                     "overlap": overlap_count,
+                    "subject_matches": subject_matches,
                     "passage_rank": passage_rank,
                     "sentence_idx": s_idx,
                 })
@@ -110,19 +160,20 @@ class ExtractiveSynthesizer:
         # Sort by total score descending
         scored_sentences.sort(key=lambda x: x["score"], reverse=True)
 
-        # Pick top 1-2 coherent sentences
-        selected = [scored_sentences[0]["text"]]
+        top_cand = scored_sentences[0]
+        selected = [top_cand["text"]]
+
+        # Single-passage coherence: only select a 2nd sentence if it comes from the SAME passage
         if max_sentences > 1 and len(scored_sentences) > 1:
-            best_first = scored_sentences[0]
-            # Look for a complementary second sentence from the same top passage if high quality
+            top_passage_rank = top_cand["passage_rank"]
             for cand in scored_sentences[1:]:
-                # Check for low redundancy with first sentence
-                words1 = set(selected[0].split())
-                words2 = set(cand["text"].split())
-                jaccard = len(words1 & words2) / max(len(words1 | words2), 1)
-                if jaccard < 0.6 and cand["overlap"] >= 1:
-                    selected.append(cand["text"])
-                    break
+                if cand["passage_rank"] == top_passage_rank:
+                    words1 = set(selected[0].split())
+                    words2 = set(cand["text"].split())
+                    jaccard = len(words1 & words2) / max(len(words1 | words2), 1)
+                    if jaccard < 0.6:
+                        selected.append(cand["text"])
+                        break
 
         answer = " ".join(selected).strip()
         elapsed_ms = round((time.perf_counter() - t0) * 1000, 3)

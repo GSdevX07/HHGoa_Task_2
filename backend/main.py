@@ -63,7 +63,7 @@ logger = logging.getLogger("rag_api")
 _INDEX_DIR = os.path.join(_REPO_ROOT, "indexes")
 _RERANKER_TOP_K = int(os.getenv("RERANKER_TOP_K", "3"))
 _RETRIEVAL_CANDIDATE_POOL = int(os.getenv("RETRIEVAL_CANDIDATE_POOL", "20"))
-_RETRIEVAL_THRESHOLD = float(os.getenv("RETRIEVAL_THRESHOLD", "0.15"))
+_RETRIEVAL_THRESHOLD = float(os.getenv("RETRIEVAL_THRESHOLD", "0.30"))
 
 # ── Global Singletons ─────────────────────────────────────────────────────────
 
@@ -107,6 +107,9 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 60)
     logger.info("HH Goa Task 2: Voice-Enabled RAG System starting up (Ultra Low-Latency Mode) ...")
     logger.info("=" * 60)
+
+    exact_cache.clear()
+    semantic_cache.clear()
 
     # ── Step 1: Try disk index ──────────────────────────────────────────────
     load_result = hybrid_retriever.load_from_disk(_INDEX_DIR)
@@ -601,6 +604,14 @@ async def _execute_rag_pipeline(
         reranker_used=reranker.is_loaded,
         synthesis_mode=synthesis_mode,
     )
+
+    # If synthesis returned empty answer (off-topic or missing subject match), mark as refusal
+    if not response.answer or len(response.answer.strip()) < 5:
+        response.answer = "I couldn't find any relevant information in the knowledge base to answer your question."
+        response.is_refusal = True
+        response.refusal_reason = "uncovered_topic"
+        response.groundedness_score = 0.0
+        response.is_grounded = False
 
     # ── 8. Post-Generation Groundedness Verification ──────────────────────────
     if enable_guardrails and response.answer and synthesis_mode == "generative":
