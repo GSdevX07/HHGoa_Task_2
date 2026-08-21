@@ -213,20 +213,29 @@ def main():
     docs = load_corpus(CORPUS_PATH)
     chunks = chunk_corpus(docs, args.strategy, args.chunk_size)
 
-    # Save the strategy used so the app knows at load time
+    # Save metadata with dimension validation support
     meta = {
         "chunking_strategy": args.strategy,
         "chunk_size": args.chunk_size,
         "embedding_model": args.model,
+        "dimension": 384 if "MiniLM" in args.model else 384,
         "total_chunks": len(chunks),
         "total_documents": len(docs),
+        "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
     os.makedirs(INDEX_DIR, exist_ok=True)
-    with open(os.path.join(INDEX_DIR, "index_meta.json"), "w") as f:
-        json.dump(meta, f, indent=2)
 
     build_dense_index(chunks, args.model, dense_dir)
     build_bm25_index(chunks, bm25_dir)
+
+    # Read actual dimension from dense retriever matrix if available
+    npy_path = os.path.join(dense_dir, "embeddings.npy")
+    if os.path.exists(npy_path):
+        emb_matrix = np.load(npy_path)
+        meta["dimension"] = int(emb_matrix.shape[1])
+
+    with open(os.path.join(INDEX_DIR, "index_meta.json"), "w") as f:
+        json.dump(meta, f, indent=2)
 
     logger.info("=" * 60)
     logger.info(f"Index build complete! {len(chunks)} chunks indexed.")

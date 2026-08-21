@@ -1,0 +1,3 @@
+# Build-Time & Dataset Evaluation Dependencies
+datasets>=2.14.0
+scikit-learn>=1.3.0

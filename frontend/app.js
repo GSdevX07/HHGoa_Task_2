@@ -4,7 +4,7 @@
  */
 
 document.addEventListener("DOMContentLoaded", () => {
-  const API_BASE = ""; // Relative URL for FastAPI backend
+  const API_BASE = window.API_BASE_URL || ""; // Relative URL or custom backend origin for production deployment
 
   // Tab Navigation Elements
   const tabBtns = document.querySelectorAll(".tab-btn");

@@ -1,3 +1,4 @@
+# Runtime Dependencies — HHGoa Task 2 (Minimal CPU Production Footprint)
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 pydantic>=2.0.0
@@ -5,16 +6,9 @@ python-dotenv>=1.0.0
 python-multipart>=0.0.6
 httpx>=0.25.0
 
-# Data
+# Numerical & ML Runtime
 numpy>=1.24.0
-datasets>=2.14.0
-
-# Dense Retrieval
 sentence-transformers>=2.7.0
 faiss-cpu>=1.7.4
-
-# Sparse Retrieval
 rank-bm25>=0.2.2
-
-# ML / Utilities
-scikit-learn>=1.3.0
+psutil>=5.9.0

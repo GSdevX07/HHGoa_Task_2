@@ -244,36 +244,28 @@ class BenchmarkRequest(BaseModel):
     include_llm: bool = False  # If False, benchmark retrieval pipeline only
 
 
-# ── Health Check ──────────────────────────────────────────────────────────────
+# ── Health & Readiness Probes ──────────────────────────────────────────────────
 
+@app.get("/health")
 @app.get("/api/health")
 async def health_check():
-    """Returns system status, API key presence, and index statistics."""
+    """Fast health check probe for load balancers / container runtime."""
+    return {"status": "ok"}
+
+
+@app.get("/ready")
+@app.get("/api/ready")
+async def ready_check():
+    """Readiness probe indicating if index & embedding model resources are initialized."""
+    is_ready = dense_retriever.is_ready
+    status_str = "ready" if is_ready else "not_ready"
     return {
-        "status": "online",
-        "version": "2.0.0",
-        "dataset": "ai4bharat/MSMARCO-XI",
+        "status": status_str,
         "index_source": _index_source,
-        "corpus_size": len(current_corpus),
         "indexed_chunks": len(dense_retriever),
-        "stt": {
-            "sarvam_key_set": bool(stt_engine.sarvam_api_key),
-            "elevenlabs_key_set": bool(stt_engine.elevenlabs_api_key),
-            "preferred_provider": stt_engine.preferred_provider,
-        },
-        "llm": {
-            "groq_key_set": bool(model_harness.groq_api_key),
-            "openai_key_set": bool(model_harness.openai_api_key),
-        },
-        "retrieval": {
-            "dense_ready": dense_retriever.is_ready,
-            "bm25_ready": bm25_retriever.is_ready,
-            "reranker": reranker.model_info,
-        },
-        "guardrails": {
-            "embedder_wired": guardrail_engine._embedder is not None,
-            "domain_anchors_embedded": guardrail_engine._anchor_embeddings is not None,
-        },
+        "embedding_model": dense_retriever.model_name,
+        "vector_dimension": dense_retriever.vector_dim,
+        "synthesis_mode": "extractive",
     }
 
 
@@ -693,39 +685,61 @@ async def run_latency_benchmark(req: BenchmarkRequest):
 
     synthesis_mode = "generative" if req.include_llm else "extractive"
 
-    queries = []
-    for doc in current_corpus:
-        q = (doc.get("query_en") or doc.get("query", "")).strip()
-        if q:
-            queries.append(q)
+    lang_code_map = {
+        "hi": "hi-IN", "hindi": "hi-IN",
+        "mr": "mr-IN", "marathi": "mr-IN",
+        "en": "en-US", "english": "en-US",
+    }
 
-    # Pad to requested count (real queries only — no fabricated queries)
-    while len(queries) < req.query_count:
-        queries = queries + queries
-    queries = queries[:req.query_count]
+    query_items = []
+    seen = set()
+
+    for doc in current_corpus:
+        q_native = doc.get("query", "").strip()
+        lang = (doc.get("language") or doc.get("lang_name", "hi")).lower()
+        l_code = lang_code_map.get(lang, "hi-IN")
+        if q_native and (q_native, l_code) not in seen:
+            seen.add((q_native, l_code))
+            query_items.append({"query": q_native, "lang_code": l_code})
+
+        q_en = doc.get("query_en", "").strip()
+        if q_en and (q_en, "en-US") not in seen:
+            seen.add((q_en, "en-US"))
+            query_items.append({"query": q_en, "lang_code": "en-US"})
+
+    if not query_items:
+        query_items = [{"query": "What is RAG?", "lang_code": "en-US"}]
+
+    # Pad to requested count if needed
+    base_items = query_items[:]
+    while len(query_items) < req.query_count:
+        query_items.extend(base_items)
+    query_items = query_items[:req.query_count]
 
     runs = []
 
     # Warmup — not counted in results
-    if queries:
+    if query_items:
         await _execute_rag_pipeline(
-            transcript=queries[0],
+            transcript=query_items[0]["query"],
             stt_latency_ms=0.0,
             stt_provider="none",
             chunking_strategy=req.chunking_strategy,
-            language_code="hi-IN",
+            language_code=query_items[0]["lang_code"],
             enable_guardrails=True,
             synthesis_mode=synthesis_mode,
         )
 
-    for idx, q in enumerate(queries, 1):
+    for idx, item in enumerate(query_items, 1):
+        q_text = item["query"]
+        l_code = item["lang_code"]
         t0 = time.perf_counter()
         resp = await _execute_rag_pipeline(
-            transcript=q,
-            stt_latency_ms=0.0,  # STT not included in benchmark (no audio file)
+            transcript=q_text,
+            stt_latency_ms=0.0,
             stt_provider="none",
             chunking_strategy=req.chunking_strategy,
-            language_code="hi-IN",
+            language_code=l_code,
             enable_guardrails=True,
             synthesis_mode=synthesis_mode,
         )
@@ -733,7 +747,8 @@ async def run_latency_benchmark(req: BenchmarkRequest):
 
         runs.append({
             "query_id": idx,
-            "query": q[:100],
+            "query": q_text[:100],
+            "language_code": l_code,
             "total_latency_ms": wall_ms,
             "stt_latency_ms": 0.0,
             "guardrail_ms": resp.stage_latencies.get("guardrail_ms", 0.0),

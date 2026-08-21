@@ -94,12 +94,41 @@ class DenseRetriever:
             self.embeddings_matrix = np.load(npy_path)
             self.vector_dim = self.embeddings_matrix.shape[1]
 
+            # Validate index dimension against loaded embedding model
+            if self.model is not None:
+                expected_dim = self.model.get_sentence_embedding_dimension()
+                if self.vector_dim != expected_dim:
+                    err_msg = (
+                        f"Index dimension mismatch! Disk index dimension ({self.vector_dim}) "
+                        f"does not match embedding model '{self.model_name}' dimension ({expected_dim}). "
+                        f"Rebuild index with `python scripts/build_index.py --model {self.model_name}`."
+                    )
+                    logger.error(f"DenseRetriever: {err_msg}")
+                    raise ValueError(err_msg)
+
+            # Check index_meta.json if present
+            index_meta_path = os.path.join(index_dir, "index_meta.json")
+            if os.path.exists(index_meta_path):
+                try:
+                    with open(index_meta_path, "r", encoding="utf-8") as f_meta:
+                        idx_meta = json.load(f_meta)
+                    stored_model = idx_meta.get("embedding_model")
+                    if stored_model and stored_model != self.model_name:
+                        logger.warning(
+                            f"DenseRetriever: index built with model '{stored_model}' "
+                            f"but running with model '{self.model_name}'."
+                        )
+                except Exception as meta_exc:
+                    logger.warning(f"DenseRetriever: could not parse index_meta.json — {meta_exc}")
+
             # Load FAISS index if available
             if os.path.exists(faiss_path):
                 try:
                     import faiss
                     self.faiss_index = faiss.read_index(faiss_path)
-                    logger.info(f"DenseRetriever: loaded FAISS index ({self.faiss_index.ntotal} vectors)")
+                    if self.faiss_index.d != self.vector_dim:
+                        raise ValueError(f"FAISS index internal dim {self.faiss_index.d} != matrix dim {self.vector_dim}")
+                    logger.info(f"DenseRetriever: loaded FAISS index ({self.faiss_index.ntotal} vectors, dim={self.faiss_index.d})")
                 except Exception as exc:
                     logger.warning(f"DenseRetriever: FAISS load failed ({exc}) — will use NumPy fallback")
                     self.faiss_index = None

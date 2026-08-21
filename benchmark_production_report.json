@@ -1,0 +1,36 @@
+{
+  "timestamp": "2026-08-21T05:42:58Z",
+  "architecture": {
+    "embedding_model": "all-MiniLM-L6-v2",
+    "vector_dimension": 384,
+    "retrieval": "Hybrid (Dense FAISS + Sparse BM25 + RRF)",
+    "reranker": "Disabled (production fast-path default)",
+    "answer_synthesis": "ExtractiveSynthesizer (CPU-first, 0 paid API cost)",
+    "index_loading": "Pre-built from indexes/ (0 runtime rebuilds)"
+  },
+  "local_process_rss_mb": 48.29,
+  "http_benchmark": {
+    "num_requests": 100,
+    "successful_requests": 100,
+    "total_benchmark_duration_s": 2.04,
+    "requests_per_second": 49.14,
+    "latency_stats_ms": {
+      "min": 11.27,
+      "p50": 20.21,
+      "p70": 23.22,
+      "p95": 30.59,
+      "p99": 34.51,
+      "max": 42.67,
+      "mean": 20.26,
+      "std_dev": 6.07
+    },
+    "stage_p50_breakdown_ms": {
+      "embedding": 0.0,
+      "retrieval": 4.03,
+      "guardrail": 0.0,
+      "synthesis": 0.0
+    },
+    "sla_compliance_pct": 100.0
+  },
+  "docker_feasibility": null
+}
